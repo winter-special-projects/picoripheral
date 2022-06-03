@@ -1,4 +1,4 @@
-; clock program
+; counter program
 ; 
 ; counts time input is high, low, pushes out to isr for read by 
 ; host - counts down from 0xffffffff for high, 0x7ffffffff for low
@@ -12,7 +12,7 @@
 ;   ticks = 5 * (0x7fffffff - ticks); # low
 ; }
 
-.program clock
+.program counter
     pull noblock    ; noblock just in case we roll over
     wait 1 pin 0    ; wait until pin goes high
     mov x :: osr    ; write 0xffffffffe to x
@@ -46,9 +46,9 @@ low:
 % c-sdk {
 
 // Helper function (for use in C program) to initialize this PIO program
-void clock_program_init(PIO pio, uint sm, uint offset, uint pin) {
+void counter_program_init(PIO pio, uint sm, uint offset, uint pin) {
 
-    pio_sm_config c = clock_program_get_default_config(offset);
+    pio_sm_config c = counter_program_get_default_config(offset);
     pio_gpio_init(pio, pin);
     sm_config_set_in_pins(&c, pin);
     sm_config_set_jmp_pin(&c, pin);
