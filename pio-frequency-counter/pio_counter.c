@@ -74,7 +74,9 @@ void i2c0_handler() {
 int main() {
   setup_default_uart();
 
-  // set up i2c
+  printf("Startup\n");
+
+  // i2c
   i2c_init(i2c0, 100e3);
   i2c_set_slave_mode(i2c0, true, I2C_ADDR);
 
@@ -88,6 +90,8 @@ int main() {
 
   irq_set_exclusive_handler(I2C0_IRQ, i2c0_handler);
   irq_set_enabled(I2C0_IRQ, true);
+
+  printf("i2c enabled at %d\n", I2C_ADDR);
 
   const uint32_t output_pin = 16;
   const uint32_t input_pin = 17;
