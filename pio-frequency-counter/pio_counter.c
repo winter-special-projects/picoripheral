@@ -23,16 +23,32 @@ uint32_t data[SIZE];
 #define GPIO_SCK0 5
 
 // i2c registers - counts, delay, high, low
-uint32_t i2c_params[4];
-uint8_t *i2c_registers = (uint8_t *)i2c_params;
-uint32_t i2c_offset;
+volatile uint32_t i2c_params[4];
+volatile uint8_t *i2c_registers = (uint8_t *)i2c_params;
+volatile uint32_t i2c_offset;
+
+// pio pointers
+uint32_t pio_off0, pio_off1;
+
+const uint32_t output_pin = 16;
+const uint32_t input_pin = 17;
 
 void arm() {
+  // pio0 - counter
+  pio_off0 = pio_add_program(pio0, &counter_program);
+  counter_program_init(pio0, 0, pio_off0, input_pin);
+
+  // pio1 - test clock
+  pio_off1 = pio_add_program(pio1, &clock_program);
+  clock_program_init(pio1, 0, pio_off1, output_pin);
+
   // clock low into pio; move to isr; push high to pio
   pio1->txf[0] = (i2c_params[3] / 10) - 3;
   pio_sm_exec(pio1, 0, pio_encode_pull(false, false));
   pio_sm_exec(pio1, 0, pio_encode_out(pio_isr, 32));
   pio1->txf[0] = (i2c_params[2] / 10) - 3;
+
+  printf("Arming with %d / %d\n", i2c_params[2], i2c_params[3]);
 
   pio_sm_set_enabled(pio1, 0, true);
   pio_sm_set_enabled(pio0, 0, true);
@@ -40,8 +56,13 @@ void arm() {
 }
 
 void disarm() {
+  // disable
   pio_sm_set_enabled(pio1, 0, false);
   pio_sm_set_enabled(pio0, 0, false);
+
+  // remove programs to reset PIO
+  pio_remove_program(pio0, &counter_program, pio_off0);
+  pio_remove_program(pio1, &clock_program, pio_off1);
 }
 
 void i2c0_handler() {
@@ -93,20 +114,6 @@ int main() {
 
   printf("i2c enabled at %d\n", I2C_ADDR);
 
-  const uint32_t output_pin = 16;
-  const uint32_t input_pin = 17;
-
-  // pio0 - counter
-  // pio1 - test clock
-
-  uint32_t offset0 = pio_add_program(pio0, &counter_program);
-
-  counter_program_init(pio0, 0, offset0, input_pin);
-
-  uint32_t offset1 = pio_add_program(pio1, &clock_program);
-
-  clock_program_init(pio1, 0, offset1, output_pin);
-
   armed = false;
 
   // sensible defaults...
@@ -130,10 +137,10 @@ int main() {
       uint32_t ticks = data[j] - 1;
       if (ticks & 0x80000000) {
         ticks = 5 * (0xffffffff - ticks);
-        printf("High: %d %d\n", ticks * 100, j);
+        printf("High: %d %d\n", ticks * 10, j);
       } else {
         ticks = 5 * (0x7fffffff - ticks);
-        printf("Low:  %d %d\n", ticks * 100, j);
+        printf("Low:  %d %d\n", ticks * 10, j);
       }
     }
   }

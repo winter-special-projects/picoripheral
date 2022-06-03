@@ -10,8 +10,10 @@ class PioCounter:
         self._smbus = smbus.SMBus(1)
 
     def setup(self, count, delay, high, low):
-        message = list(struct.pack("IIII", count, delay, high, low))
+        message = list(struct.pack("I", count))
         self._smbus.write_i2c_block_data(self._i2c_address, 0x00, message)
+        message = list(struct.pack("III", delay, high, low))
+        self._smbus.write_i2c_block_data(self._i2c_address, 0x01, message)
 
     def arm(self):
         self._smbus.write_i2c_block_data(self._i2c_address, 0xFF, [])
@@ -19,5 +21,5 @@ class PioCounter:
 
 if __name__ == "__main__":
     pc = PioCounter()
-    pc.setup(1000, 0, 50000, 50000)
+    pc.setup(50000, 0, 100, 900)
     pc.arm()
