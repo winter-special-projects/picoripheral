@@ -5,7 +5,7 @@
 #include "pico/stdlib.h"
 
 #include "clock.pio.h"
-#include "timer.pio.h"
+#include "counter.pio.h"
 
 #define SIZE 50000
 
@@ -17,16 +17,16 @@ int main() {
   const uint32_t output_pin = 16;
   const uint32_t input_pin = 17;
 
-  // pio0 - input timer
-  // pio1 - output clock
+  // pio0 - counter
+  // pio1 - test clock
 
-  uint32_t offset0 = pio_add_program(pio0, &clock_program);
+  uint32_t offset0 = pio_add_program(pio0, &counter_program);
 
-  clock_program_init(pio0, 0, offset0, input_pin);
+  counter_program_init(pio0, 0, offset0, input_pin);
 
-  uint32_t offset1 = pio_add_program(pio1, &timer_program);
+  uint32_t offset1 = pio_add_program(pio1, &clock_program);
 
-  timer_program_init(pio1, 0, offset1, output_pin, 125);
+  clock_program_init(pio1, 0, offset1, output_pin, 125);
 
   pio1->txf[0] = 500000 - 3;
 

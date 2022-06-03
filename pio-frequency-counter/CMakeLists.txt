@@ -14,7 +14,7 @@ pico_sdk_init()
 add_executable(pio_clock pio_clock.c)
 
 pico_generate_pio_header(pio_clock ${CMAKE_CURRENT_LIST_DIR}/counter.pio)
-pico_generate_pio_header(pio_clock ${CMAKE_CURRENT_LIST_DIR}/timer.pio)
+pico_generate_pio_header(pio_clock ${CMAKE_CURRENT_LIST_DIR}/clock.pio)
 
 pico_set_program_name(pio_clock "pio_clock")
 pico_set_program_version(pio_clock "0.1")
