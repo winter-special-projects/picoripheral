@@ -8,14 +8,21 @@
 #include "clock.pio.h"
 #include "counter.pio.h"
 
-// we can store at most arounf 50000 uint32_t
+// 50000 uint32_t is 200kB i.e. _most_ of the available RAM
 #define SIZE 50000
 
 volatile uint32_t counter, counts;
+volatile bool armed;
 uint32_t data[SIZE];
 
-void arm();
-void disarm();
+void arm() {
+  pio1->txf[0] = i2c_params[2] - 3;
+  pio_set_enabled(pio1, 0, true);
+  pio_set_enabled(pio0, 0, true);
+  armed = true;
+}
+
+void disarm(pio_set_enabled(pio1, 0, false); pio_set_enabled(pio0, 0, false););
 
 // i2c setup
 #define I2C_ADDR 0x40
@@ -43,7 +50,7 @@ void i2c0_handler() {
         // set counts
         offset = 0x0;
       } else if (command == 0x01) {
-        // write driver settings
+        // write clock settings
         offset = 0x4;
       }
     } else {
@@ -55,6 +62,21 @@ void i2c0_handler() {
 
 int main() {
   setup_default_uart();
+
+  // set up i2c
+  i2c_init(i2c0, 100e3);
+  i2c_set_slave_mode(i2c0, true, I2C_ADDR);
+
+  gpio_set_function(GPIO_SDA0, GPIO_FUNC_I2C);
+  gpio_set_function(GPIO_SCK0, GPIO_FUNC_I2C);
+  gpio_pull_up(GPIO_SDA0);
+  gpio_pull_up(GPIO_SCK0);
+
+  i2c0_hw->intr_mask =
+      I2C_IC_INTR_MASK_M_RD_REQ_BITS | I2C_IC_INTR_MASK_M_RX_FULL_BITS;
+
+  irq_set_exclusive_handler(I2C0_IRQ, i2c0_handler);
+  irq_set_enabled(I2C0_IRQ, true);
 
   const uint32_t output_pin = 16;
   const uint32_t input_pin = 17;
@@ -70,24 +92,31 @@ int main() {
 
   clock_program_init(pio1, 0, offset1, output_pin, 125);
 
-  pio1->txf[0] = 500000 - 3;
+  armed = false;
 
-  pio_sm_set_enabled(pio1, 0, true);
-  pio_sm_set_enabled(pio0, 0, true);
+  // sensible defaults...
+  i2c_params[1] = 0;
+  i2c_params[2] = 50;
+  i2c_params[3] = 50;
 
   while (true) {
-    for (int j = 0; j < SIZE; j++) {
+    // wait until we are ready to go
+    while (!armed) {
+      tight_loop_contents();
+    }
+
+    for (int j = 0; j < i2c_params[0]; j++) {
       counts[j] = pio_sm_get_blocking(pio0, 0);
     }
 
-    for (int j = 0; j < SIZE; j++) {
+    for (int j = 0; j < i2c_params[0]; j++) {
       uint32_t ticks = counts[j] - 1;
       if (ticks & 0x80000000) {
         ticks = 5 * (0xffffffff - ticks);
-        printf("High: %d %d\n", ticks / 10, j);
+        printf("High: %d %d\n", ticks * 100, j);
       } else {
         ticks = 5 * (0x7fffffff - ticks);
-        printf("Low:  %d %d\n", ticks / 10, j);
+        printf("Low:  %d %d\n", ticks * 100, j);
       }
     }
   }
