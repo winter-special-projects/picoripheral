@@ -21,5 +21,5 @@ class PioCounter:
 
 if __name__ == "__main__":
     pc = PioCounter()
-    pc.setup(50000, 0, 100, 900)
+    pc.setup(500, 0, 100, 999900)
     pc.arm()

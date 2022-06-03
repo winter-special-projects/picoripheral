@@ -57,8 +57,8 @@ void arm() {
 
 void disarm() {
   // disable
-  pio_sm_set_enabled(pio1, 0, false);
   pio_sm_set_enabled(pio0, 0, false);
+  pio_sm_set_enabled(pio1, 0, false);
 
   // remove programs to reset PIO
   pio_remove_program(pio0, &counter_program, pio_off0);
