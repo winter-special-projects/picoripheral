@@ -1,0 +1,66 @@
+; counter program
+; 
+; counts time input is high, low, pushes out to isr for read by 
+; host - counts down from 0xffffffff for high, 0x7ffffffff for low
+; so host can use MSB to decide if high or low - counts cpu
+; ticks / 5 and returns 1 fewer counts because transitions
+;
+; uint32_t ticks = pio_sm_get_blocking(pio0, 0) - 1;
+; if (ticks & 0x80000000) {
+;   ticks = 5 * (0xffffffff - ticks); # high
+; } else {
+;   ticks = 5 * (0x7fffffff - ticks); # low
+; }
+
+.program counter
+    pull noblock    ; noblock just in case we roll over
+    wait 1 pin 0    ; wait until pin goes high
+    mov x :: osr    ; write 0xffffffffe to x
+    nop [7]
+    jmp high;
+rise:
+    nop [1]         ; 2 cycle delay as came from jmp y-- rise
+    mov isr x       ; push x out
+    push
+    mov x !null     ; write 0xffffffff to x
+    jmp x-- high    ; jmp to high subtracting 1 (could nop)
+high:
+    in null 31      ; fill ISR with 0
+    in pins 1       ; read pin
+    mov y isr       ; move to y so can use for branch
+    jmp !y fall     ; if y == 0 jmp
+    jmp x-- high    ; x-- because still high
+fall:
+    nop [1]         ; 2 cycle delay as came from jmp! y fall
+    mov isr x       ; as above
+    push
+    mov x osr       ; read 0x7ffffffff into x
+    jmp x-- low     ; as above
+low:
+    in null 31      ; fill 0
+    in pins 1       ; read
+    mov y isr       ; copy
+    jmp y-- rise    ; if y nonzero before decr jump
+    jmp x-- low     ; x-- because still low
+
+% c-sdk {
+
+// Helper function (for use in C program) to initialize this PIO program
+void counter_program_init(PIO pio, uint sm, uint offset, uint pin) {
+
+    pio_sm_config c = counter_program_get_default_config(offset);
+    pio_gpio_init(pio, pin);
+    sm_config_set_in_pins(&c, pin);
+    sm_config_set_jmp_pin(&c, pin);
+    // sm_config_set_set_pins(&c, pin, 1);
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, false);
+    sm_config_set_clkdiv_int_frac(&c, 12, 128);
+    pio_sm_init(pio, sm, offset, &c);
+
+    // initialise with as many ticks as possible TODO: count clock ticks
+    // per iteration to make sure I know how many seconds this is worth
+    pio->txf[sm] = 0x7fffffff;
+}
+
+%}
+
