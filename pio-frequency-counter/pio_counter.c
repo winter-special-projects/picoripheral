@@ -28,7 +28,12 @@ uint8_t *i2c_registers = (uint8_t *)i2c_params;
 uint32_t i2c_offset;
 
 void arm() {
-  pio1->txf[0] = i2c_params[2] - 3;
+  // clock low into pio; move to isr; push high to pio
+  pio1->txf[0] = (i2c_params[3] / 10) - 3;
+  pio_sm_exec(pio1, 0, pio_encode_pull(false, false));
+  pio_sm_exec(pio1, 0, pio_encode_out(pio_isr, 32));
+  pio1->txf[0] = (i2c_params[2] / 10) - 3;
+
   pio_sm_set_enabled(pio1, 0, true);
   pio_sm_set_enabled(pio0, 0, true);
   armed = true;
@@ -96,14 +101,14 @@ int main() {
 
   uint32_t offset1 = pio_add_program(pio1, &clock_program);
 
-  clock_program_init(pio1, 0, offset1, output_pin, 125);
+  clock_program_init(pio1, 0, offset1, output_pin);
 
   armed = false;
 
   // sensible defaults...
   i2c_params[1] = 0;
-  i2c_params[2] = 50;
-  i2c_params[3] = 50;
+  i2c_params[2] = 50000;
+  i2c_params[3] = 50000;
 
   while (true) {
     // wait until we are ready to go
@@ -114,6 +119,8 @@ int main() {
     for (int j = 0; j < i2c_params[0]; j++) {
       data[j] = pio_sm_get_blocking(pio0, 0);
     }
+
+    disarm();
 
     for (int j = 0; j < i2c_params[0]; j++) {
       uint32_t ticks = data[j] - 1;
