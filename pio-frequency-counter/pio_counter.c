@@ -4,6 +4,7 @@
 #include "hardware/i2c.h"
 #include "hardware/irq.h"
 #include "hardware/pio.h"
+#include "hardware/spi.h"
 #include "pico/stdlib.h"
 
 #include "clock.pio.h"
@@ -95,8 +96,6 @@ void i2c0_handler() {
 int main() {
   setup_default_uart();
 
-  printf("Startup\n");
-
   // i2c
   i2c_init(i2c0, 100e3);
   i2c_set_slave_mode(i2c0, true, I2C_ADDR);
@@ -112,7 +111,18 @@ int main() {
   irq_set_exclusive_handler(I2C0_IRQ, i2c0_handler);
   irq_set_enabled(I2C0_IRQ, true);
 
-  printf("i2c enabled at %d\n", I2C_ADDR);
+  printf("i2c enabled\n");
+
+  // spi - at demand of 10 MHz
+  spi_inst_t *spi = spi1;
+  uint32_t baud = spi_init(spi, 10000000);
+  spi_set_format(spi, 8, 1, 1, SPI_MSB_FIRST);
+  gpio_set_function(10, GPIO_FUNC_SPI);
+  gpio_set_function(11, GPIO_FUNC_SPI);
+  gpio_set_function(12, GPIO_FUNC_SPI);
+  gpio_set_function(13, GPIO_FUNC_SPI);
+  spi_set_slave(spi, true);
+  printf("spi enabled at %d\n", baud);
 
   armed = false;
 
@@ -133,15 +143,22 @@ int main() {
 
     disarm();
 
+    // fix up data - retain MSB as high / low
+
     for (int j = 0; j < i2c_params[0]; j++) {
       uint32_t ticks = data[j] - 1;
       if (ticks & 0x80000000) {
-        ticks = 5 * (0xffffffff - ticks);
-        printf("High: %d %d\n", ticks * 10, j);
+        ticks = 50 * (0xffffffff - ticks);
+        data[j] = ticks + 0x80000000;
       } else {
-        ticks = 5 * (0x7fffffff - ticks);
-        printf("Low:  %d %d\n", ticks * 10, j);
+        ticks = 50 * (0x7fffffff - ticks);
+        data[j] = ticks;
       }
     }
+    // spi transfer
+    uint8_t *buffer = (uint8_t *)data;
+    int transmit =
+        spi_write_read_blocking(spi, buffer, buffer, 4 * i2c_params[0]);
+    printf("sent %d bytes\n", transmit);
   }
 }
