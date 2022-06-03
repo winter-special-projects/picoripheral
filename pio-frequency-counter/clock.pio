@@ -5,7 +5,7 @@
     set pins, 1
 lp1:
     jmp x-- lp1
-    mov x, osr
+    mov x, isr
     set pins, 0
 lp2:
     jmp x-- lp2
@@ -13,12 +13,12 @@ lp2:
 
 
 % c-sdk {
-void clock_program_init(PIO pio, uint sm, uint offset, uint pin, uint16_t div) {
+void clock_program_init(PIO pio, uint sm, uint offset, uint pin) {
    pio_gpio_init(pio, pin);
    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
    pio_sm_config c = clock_program_get_default_config(offset);
    sm_config_set_set_pins(&c, pin, 1);
-   sm_config_set_clkdiv_int_frac(&c, div, 0);
+   sm_config_set_clkdiv_int_frac(&c, 1, 64);
    pio_sm_init(pio, sm, offset, &c);
 }
 %}
