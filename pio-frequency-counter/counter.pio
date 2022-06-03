@@ -54,7 +54,7 @@ void counter_program_init(PIO pio, uint sm, uint offset, uint pin) {
     sm_config_set_jmp_pin(&c, pin);
     // sm_config_set_set_pins(&c, pin, 1);
     pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, false);
-    sm_config_set_clkdiv_int_frac(&c, 12, 128);
+    sm_config_set_clkdiv_int_frac(&c, 1, 64);
     pio_sm_init(pio, sm, offset, &c);
 
     // initialise with as many ticks as possible TODO: count clock ticks
