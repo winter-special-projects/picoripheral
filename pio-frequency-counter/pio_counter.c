@@ -2,6 +2,7 @@
 
 #include "hardware/clocks.h"
 #include "hardware/i2c.h"
+#include "hardware/irq.h"
 #include "hardware/pio.h"
 #include "pico/stdlib.h"
 
@@ -15,15 +16,6 @@ volatile uint32_t counter, counts;
 volatile bool armed;
 uint32_t data[SIZE];
 
-void arm() {
-  pio1->txf[0] = i2c_params[2] - 3;
-  pio_set_enabled(pio1, 0, true);
-  pio_set_enabled(pio0, 0, true);
-  armed = true;
-}
-
-void disarm(pio_set_enabled(pio1, 0, false); pio_set_enabled(pio0, 0, false););
-
 // i2c setup
 #define I2C_ADDR 0x40
 
@@ -35,9 +27,23 @@ uint32_t i2c_params[4];
 uint8_t *i2c_registers = (uint8_t *)i2c_params;
 uint32_t i2c_offset;
 
+void arm() {
+  pio1->txf[0] = i2c_params[2] - 3;
+  pio_sm_set_enabled(pio1, 0, true);
+  pio_sm_set_enabled(pio0, 0, true);
+  armed = true;
+}
+
+void disarm() {
+  pio_sm_set_enabled(pio1, 0, false);
+  pio_sm_set_enabled(pio0, 0, false);
+}
+
 void i2c0_handler() {
   uint32_t status = i2c0_hw->intr_stat;
   uint32_t value;
+
+  uint8_t command;
 
   if (status & I2C_IC_INTR_STAT_R_RX_FULL_BITS) {
     value = i2c0_hw->data_cmd;
@@ -48,14 +54,14 @@ void i2c0_handler() {
         arm();
       } else if (command == 0x00) {
         // set counts
-        offset = 0x0;
+        i2c_offset = 0x0;
       } else if (command == 0x01) {
         // write clock settings
-        offset = 0x4;
+        i2c_offset = 0x4;
       }
     } else {
       // copy in settings
-      i2c_registers[offset++] = (uint8_t)(value & I2C_IC_DATA_CMD_BITS);
+      i2c_registers[i2c_offset++] = (uint8_t)(value & I2C_IC_DATA_CMD_BITS);
     }
   }
 }
@@ -106,11 +112,11 @@ int main() {
     }
 
     for (int j = 0; j < i2c_params[0]; j++) {
-      counts[j] = pio_sm_get_blocking(pio0, 0);
+      data[j] = pio_sm_get_blocking(pio0, 0);
     }
 
     for (int j = 0; j < i2c_params[0]; j++) {
-      uint32_t ticks = counts[j] - 1;
+      uint32_t ticks = data[j] - 1;
       if (ticks & 0x80000000) {
         ticks = 5 * (0xffffffff - ticks);
         printf("High: %d %d\n", ticks * 100, j);
