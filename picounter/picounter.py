@@ -47,19 +47,14 @@ class Picounter:
         spi.close()
 
         data = struct.unpack(f"{self._count}I", data)
-        high = []
-        low = []
-        for j, d in enumerate(data):
-            if j % 2:
-                low.append(d)
-            else:
-                high.append(d - 0x80000000)
+        high = [d - 0x80000000 for d in data if d > 0x8000000]
+        low = [d for d in data if d < 0x8000000]
         return high, low
 
 
 if __name__ == "__main__":
     pc = Picounter()
-    pc.setup(10000, 0, 100, 999_900)
+    pc.setup(10000, 0, 100, 900)
     pc.arm()
     while pc.armed():
         pass
