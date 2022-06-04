@@ -25,6 +25,7 @@ pico_enable_stdio_usb(pio_counter 0)
 target_link_libraries(pio_counter pico_stdlib)
 target_link_libraries(pio_counter hardware_pio)
 target_link_libraries(pio_counter hardware_i2c)
+target_link_libraries(pio_counter hardware_spi)
 
 pico_add_extra_outputs(pio_counter)
 

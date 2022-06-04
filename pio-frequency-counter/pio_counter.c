@@ -4,6 +4,7 @@
 #include "hardware/i2c.h"
 #include "hardware/irq.h"
 #include "hardware/pio.h"
+#include "hardware/spi.h"
 #include "pico/stdlib.h"
 
 #include "clock.pio.h"
@@ -30,10 +31,15 @@ volatile uint32_t i2c_offset;
 // pio pointers
 uint32_t pio_off0, pio_off1;
 
+// pin definitions - should #define
 const uint32_t output_pin = 16;
 const uint32_t input_pin = 17;
+const uint32_t status_pin = 14;
 
 void arm() {
+  // set arming on status pin
+  gpio_put(status_pin, true);
+
   // pio0 - counter
   pio_off0 = pio_add_program(pio0, &counter_program);
   counter_program_init(pio0, 0, pio_off0, input_pin);
@@ -63,6 +69,9 @@ void disarm() {
   // remove programs to reset PIO
   pio_remove_program(pio0, &counter_program, pio_off0);
   pio_remove_program(pio1, &clock_program, pio_off1);
+
+  // disarm status
+  gpio_put(status_pin, false);
 }
 
 void i2c0_handler() {
@@ -95,8 +104,6 @@ void i2c0_handler() {
 int main() {
   setup_default_uart();
 
-  printf("Startup\n");
-
   // i2c
   i2c_init(i2c0, 100e3);
   i2c_set_slave_mode(i2c0, true, I2C_ADDR);
@@ -112,14 +119,30 @@ int main() {
   irq_set_exclusive_handler(I2C0_IRQ, i2c0_handler);
   irq_set_enabled(I2C0_IRQ, true);
 
-  printf("i2c enabled at %d\n", I2C_ADDR);
-
-  armed = false;
-
   // sensible defaults...
   i2c_params[1] = 0;
   i2c_params[2] = 50000;
   i2c_params[3] = 50000;
+
+  printf("i2c enabled\n");
+
+  // spi - at demand of 10 MHz
+  spi_inst_t *spi = spi1;
+  uint32_t baud = spi_init(spi, 10000000);
+  spi_set_format(spi, 8, 1, 1, SPI_MSB_FIRST);
+  gpio_set_function(10, GPIO_FUNC_SPI);
+  gpio_set_function(11, GPIO_FUNC_SPI);
+  gpio_set_function(12, GPIO_FUNC_SPI);
+  gpio_set_function(13, GPIO_FUNC_SPI);
+  spi_set_slave(spi, true);
+  printf("spi enabled at %d\n", baud);
+
+  // status pin
+  gpio_init(status_pin);
+  gpio_set_dir(status_pin, GPIO_OUT);
+  gpio_put(status_pin, false);
+
+  armed = false;
 
   while (true) {
     // wait until we are ready to go
@@ -133,15 +156,22 @@ int main() {
 
     disarm();
 
+    // fix up data - retain MSB as high / low
+
     for (int j = 0; j < i2c_params[0]; j++) {
       uint32_t ticks = data[j] - 1;
       if (ticks & 0x80000000) {
-        ticks = 5 * (0xffffffff - ticks);
-        printf("High: %d %d\n", ticks * 10, j);
+        ticks = 50 * (0xffffffff - ticks);
+        data[j] = ticks + 0x80000000;
       } else {
-        ticks = 5 * (0x7fffffff - ticks);
-        printf("Low:  %d %d\n", ticks * 10, j);
+        ticks = 50 * (0x7fffffff - ticks);
+        data[j] = ticks;
       }
     }
+    // spi transfer
+    uint8_t *buffer = (uint8_t *)data;
+    int transmit =
+        spi_write_read_blocking(spi, buffer, buffer, 4 * i2c_params[0]);
+    printf("sent %d bytes\n", transmit);
   }
 }
