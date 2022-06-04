@@ -11,18 +11,17 @@ Though not sure how reliable will be below this.
 Hook up second pico running MicroPython as a pulse generator, hooking up a PWM to a GPIO pin such as:
 
 ```python
-from machine import Pin, PWM, RTC
-from time import sleep, time
+from machine import Pin, PWMC
+from math import sin
 
 pwm = PWM(Pin(17))
+pwm.freq(1000)
 
 for j in range(100):
-    for duty in range(0, 0xff00, 2):
-        pwm.duty_u16(duty)
-    for duty in range(0xff00, 0, -2):
-        pwm.duty_u16(duty)
+    for t in range(0, 62832):
+        pwm.duty_u16(int(0x8000 + 0x4000 * sin(0.0001 * t)))
 ```
 
-This will generate PWM pulses on (it would seem) a default frequency of 1 kHz, with duty cycle from 0 to nearly 100%. Hooking up the timer and saving the high and low times from this (sampling from the middle of a "run") gives the following output:
+This will generate PWM pulses on (it would seem) a default frequency of 1 kHz, with duty cycle from 25% to 75%. Hooking up the timer and saving the high and low times from this (sampling from the middle of a "run") gives the following output:
 
 ![PWM graph](./pwm.png)
