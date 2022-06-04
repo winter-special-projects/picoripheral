@@ -7,25 +7,25 @@ set(PICO_SDK_PATH "/home/pi/C/pico/pico-sdk")
 
 include(../common_import.cmake)
 
-project(pio_counter C CXX ASM)
+project(picounter C CXX ASM)
 
 pico_sdk_init()
 
-add_executable(pio_counter pio_counter.c)
+add_executable(picounter picounter.c)
 
-pico_generate_pio_header(pio_counter ${CMAKE_CURRENT_LIST_DIR}/counter.pio)
-pico_generate_pio_header(pio_counter ${CMAKE_CURRENT_LIST_DIR}/clock.pio)
+pico_generate_pio_header(picounter ${CMAKE_CURRENT_LIST_DIR}/counter.pio)
+pico_generate_pio_header(picounter ${CMAKE_CURRENT_LIST_DIR}/clock.pio)
 
-pico_set_program_name(pio_counter "pio_counter")
-pico_set_program_version(pio_counter "0.1")
+pico_set_program_name(picounter "picounter")
+pico_set_program_version(picounter "0.1")
 
-pico_enable_stdio_uart(pio_counter 1)
-pico_enable_stdio_usb(pio_counter 0)
+pico_enable_stdio_uart(picounter 1)
+pico_enable_stdio_usb(picounter 0)
 
-target_link_libraries(pio_counter pico_stdlib)
-target_link_libraries(pio_counter hardware_pio)
-target_link_libraries(pio_counter hardware_i2c)
-target_link_libraries(pio_counter hardware_spi)
+target_link_libraries(picounter pico_stdlib)
+target_link_libraries(picounter hardware_pio)
+target_link_libraries(picounter hardware_i2c)
+target_link_libraries(picounter hardware_spi)
 
-pico_add_extra_outputs(pio_counter)
+pico_add_extra_outputs(picounter)
 
