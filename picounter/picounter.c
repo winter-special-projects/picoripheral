@@ -40,23 +40,23 @@ void arm() {
   // set arming on status pin
   gpio_put(status_pin, true);
 
-  // pio0 - counter
+  // pio0,0 - counter
   pio_off0 = pio_add_program(pio0, &counter_program);
   counter_program_init(pio0, 0, pio_off0, input_pin);
 
-  // pio1 - test clock
+  // pio0,1 - test clock
   pio_off1 = pio_add_program(pio0, &clock_program);
   clock_program_init(pio0, 1, pio_off1, output_pin);
 
   // clock low into pio; move to isr; push high to pio
-  pio1->txf[0] = (i2c_params[3] / 10) - 3;
+  pio0->txf[1] = (i2c_params[3] / 10) - 3;
   pio_sm_exec(pio0, 1, pio_encode_pull(false, false));
   pio_sm_exec(pio0, 1, pio_encode_out(pio_isr, 32));
-  pio1->txf[0] = (i2c_params[2] / 10) - 3;
+  pio0->txf[1] = (i2c_params[2] / 10) - 3;
 
   printf("arm with %d / %d\n", i2c_params[2], i2c_params[3]);
 
-  pio_enable_sm_mask_in_sync(pio0, 0x11);
+  pio_enable_sm_mask_in_sync(pio0, 0b11);
   armed = true;
 }
 
