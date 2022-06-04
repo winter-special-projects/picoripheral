@@ -45,30 +45,29 @@ void arm() {
   counter_program_init(pio0, 0, pio_off0, input_pin);
 
   // pio1 - test clock
-  pio_off1 = pio_add_program(pio1, &clock_program);
-  clock_program_init(pio1, 0, pio_off1, output_pin);
+  pio_off1 = pio_add_program(pio0, &clock_program);
+  clock_program_init(pio0, 1, pio_off1, output_pin);
 
   // clock low into pio; move to isr; push high to pio
   pio1->txf[0] = (i2c_params[3] / 10) - 3;
-  pio_sm_exec(pio1, 0, pio_encode_pull(false, false));
-  pio_sm_exec(pio1, 0, pio_encode_out(pio_isr, 32));
+  pio_sm_exec(pio0, 1, pio_encode_pull(false, false));
+  pio_sm_exec(pio0, 1, pio_encode_out(pio_isr, 32));
   pio1->txf[0] = (i2c_params[2] / 10) - 3;
 
-  printf("Arming with %d / %d\n", i2c_params[2], i2c_params[3]);
+  printf("arm with %d / %d\n", i2c_params[2], i2c_params[3]);
 
-  pio_sm_set_enabled(pio1, 0, true);
-  pio_sm_set_enabled(pio0, 0, true);
+  pio_enable_sm_mask_in_sync(pio0, 0x11);
   armed = true;
 }
 
 void disarm() {
   // disable
   pio_sm_set_enabled(pio0, 0, false);
-  pio_sm_set_enabled(pio1, 0, false);
+  pio_sm_set_enabled(pio0, 1, false);
 
   // remove programs to reset PIO
   pio_remove_program(pio0, &counter_program, pio_off0);
-  pio_remove_program(pio1, &clock_program, pio_off1);
+  pio_remove_program(pio0, &clock_program, pio_off1);
 
   // disarm status
   gpio_put(status_pin, false);
