@@ -31,10 +31,15 @@ volatile uint32_t i2c_offset;
 // pio pointers
 uint32_t pio_off0, pio_off1;
 
+// pin definitions - should #define
 const uint32_t output_pin = 16;
 const uint32_t input_pin = 17;
+const uint32_t status_pin = 14;
 
 void arm() {
+  // set arming on status pin
+  gpio_put(status_pin, true);
+
   // pio0 - counter
   pio_off0 = pio_add_program(pio0, &counter_program);
   counter_program_init(pio0, 0, pio_off0, input_pin);
@@ -64,6 +69,9 @@ void disarm() {
   // remove programs to reset PIO
   pio_remove_program(pio0, &counter_program, pio_off0);
   pio_remove_program(pio1, &clock_program, pio_off1);
+
+  // disarm status
+  gpio_put(status_pin, false);
 }
 
 void i2c0_handler() {
@@ -111,6 +119,11 @@ int main() {
   irq_set_exclusive_handler(I2C0_IRQ, i2c0_handler);
   irq_set_enabled(I2C0_IRQ, true);
 
+  // sensible defaults...
+  i2c_params[1] = 0;
+  i2c_params[2] = 50000;
+  i2c_params[3] = 50000;
+
   printf("i2c enabled\n");
 
   // spi - at demand of 10 MHz
@@ -124,12 +137,12 @@ int main() {
   spi_set_slave(spi, true);
   printf("spi enabled at %d\n", baud);
 
-  armed = false;
+  // status pin
+  gpio_init(status_pin);
+  gpio_set_dir(status_pin, GPIO_OUT);
+  gpio_put(status_pin, false);
 
-  // sensible defaults...
-  i2c_params[1] = 0;
-  i2c_params[2] = 50000;
-  i2c_params[3] = 50000;
+  armed = false;
 
   while (true) {
     // wait until we are ready to go

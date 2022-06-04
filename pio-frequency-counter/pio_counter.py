@@ -4,6 +4,8 @@ import time
 import smbus
 import spidev
 
+from RPi import GPIO
+
 
 class PioCounter:
     def __init__(self):
@@ -11,6 +13,17 @@ class PioCounter:
         self._i2c_address = 0x40
         self._smbus = smbus.SMBus(1)
         self._count = 0
+
+        # status pin
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(16, GPIO.IN)
+
+    def __del__(self):
+        GPIO.cleanup()
+
+    def armed(self):
+        time.sleep(0.01)
+        return GPIO.input(16)
 
     def setup(self, count, delay, high, low):
         self._count = count
@@ -40,6 +53,8 @@ if __name__ == "__main__":
     pc = PioCounter()
     pc.setup(500, 0, 100, 999_900)
     pc.arm()
+    while pc.armed():
+        pass
     data = pc.read()
     for j, d in enumerate(data):
         print(j, d)
