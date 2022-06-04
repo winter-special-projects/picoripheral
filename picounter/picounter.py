@@ -54,7 +54,7 @@ class Picounter:
 
 if __name__ == "__main__":
     pc = Picounter()
-    pc.setup(10000, 0, 100, 999_900)
+    pc.setup(10000, 0, 100, 900)
     pc.arm()
     while pc.armed():
         pass
