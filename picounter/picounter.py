@@ -7,7 +7,7 @@ import spidev
 from RPi import GPIO
 
 
-class PioCounter:
+class Picounter:
     def __init__(self):
         # connectivity
         self._i2c_address = 0x40
@@ -58,7 +58,7 @@ class PioCounter:
 
 
 if __name__ == "__main__":
-    pc = PioCounter()
+    pc = Picounter()
     pc.setup(10000, 0, 100, 999_900)
     pc.arm()
     while pc.armed():
