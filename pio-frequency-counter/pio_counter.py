@@ -46,15 +46,23 @@ class PioCounter:
         data = bytearray(spi.xfer3(zero))
         spi.close()
 
-        return struct.unpack(f"{self._count}I", data)
+        data = struct.unpack(f"{self._count}I", data)
+        high = []
+        low = []
+        for j, d in enumerate(data):
+            if j % 2:
+                low.append(d)
+            else:
+                high.append(d - 0x80000000)
+        return high, low
 
 
 if __name__ == "__main__":
     pc = PioCounter()
-    pc.setup(500, 0, 100, 999_900)
+    pc.setup(10000, 0, 100, 999_900)
     pc.arm()
     while pc.armed():
         pass
-    data = pc.read()
-    for j, d in enumerate(data):
-        print(j, d)
+    high, low = pc.read()
+    for j, (h, l) in enumerate(zip(high, low)):
+        print(j, h, l)
