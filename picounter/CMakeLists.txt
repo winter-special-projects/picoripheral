@@ -26,6 +26,7 @@ target_link_libraries(picounter pico_stdlib)
 target_link_libraries(picounter hardware_pio)
 target_link_libraries(picounter hardware_i2c)
 target_link_libraries(picounter hardware_spi)
+target_link_libraries(picounter hardware_dma)
 
 pico_add_extra_outputs(picounter)
 
