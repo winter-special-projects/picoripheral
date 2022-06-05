@@ -175,12 +175,6 @@ int main() {
     dma_channel_wait_for_finish_blocking(dma_rx);
     printf("dma completed\n");
 
-    /*
-    for (int j = 0; j < i2c_params[0]; j++) {
-      data[j] = pio_sm_get_blocking(pio0, 0);
-    }
-    */
-
     disarm();
 
     // fix up data - retain MSB as high / low
