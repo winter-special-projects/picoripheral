@@ -62,6 +62,10 @@ void arm() {
 }
 
 void disarm() {
+  // disarm flag
+  armed = false;
+
+
   // disable
   pio_sm_set_enabled(pio0, 0, false);
   pio_sm_set_enabled(pio0, 1, false);
