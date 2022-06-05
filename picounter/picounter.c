@@ -149,6 +149,7 @@ int main() {
   channel_config_set_dreq(&dma_c, pio_get_dreq(pio0, 0, false));
   channel_config_set_read_increment(&dma_c, false);
   channel_config_set_write_increment(&dma_c, true);
+  printf("dma configured\n");
 
   armed = false;
 
@@ -164,6 +165,7 @@ int main() {
 
     // start dma
     dma_start_channel_mask(1u << dma_rx);
+    printf("dma started\n");
 
     // wait for complete
     dma_channel_wait_for_finish_blocking(dma_rx);
