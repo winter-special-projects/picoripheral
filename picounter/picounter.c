@@ -156,23 +156,30 @@ int main() {
 
   armed = false;
 
-  // deploy dma
-  dma_channel_configure(dma_rx, &dma_c, (volatile void *)data,
-                        (const volatile void *)&(pio0->rxf[0]), 0, false);
-
   while (true) {
     // wait until we are ready to go
     while (!armed) {
       tight_loop_contents();
     }
 
-    // update and start dma
-    dma_channel_set_trans_count(dma_rx, i2c_params[0], true);
+    // deploy dma
+    dma_channel_configure(dma_rx, &dma_c, (volatile void *)data,
+                          (const volatile void *)&(pio0->rxf[0]), i2c_params[0],
+                          false);
+
+    // start dma
+    dma_channel_start(dma_rx);
     printf("dma started\n");
 
     // wait for complete
     dma_channel_wait_for_finish_blocking(dma_rx);
     printf("dma completed\n");
+
+    /*
+    for (int j = 0; j < i2c_params[0]; j++) {
+      data[j] = pio_sm_get_blocking(pio0, 0);
+    }
+    */
 
     disarm();
 
