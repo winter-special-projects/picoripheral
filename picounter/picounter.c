@@ -160,15 +160,16 @@ int main() {
     }
 
     // deploy dma
-    dma_channel_configure(dma_rx, &dma_c, &(pio0->rxf[0]), data, i2c_params[0],
+    dma_channel_configure(dma_rx, &dma_c, (volatile void *) data, (const volatile void *) &(pio0->rxf[0]), i2c_params[0],
                           false);
 
     // start dma
-    dma_start_channel_mask(1u << dma_rx);
+    dma_channel_start(dma_rx);
     printf("dma started\n");
 
     // wait for complete
     dma_channel_wait_for_finish_blocking(dma_rx);
+    printf("dma completed\n");
 
     /*
     for (int j = 0; j < i2c_params[0]; j++) {
