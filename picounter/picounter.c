@@ -29,10 +29,6 @@ volatile uint32_t i2c_params[4];
 volatile uint8_t *i2c_registers = (uint8_t *)i2c_params;
 volatile uint32_t i2c_offset;
 
-// dma channels
-const uint32_t dma_rx;
-dma_channel_config dma_c;
-
 // pio pointers
 uint32_t pio_off0, pio_off1;
 
@@ -60,15 +56,6 @@ void arm() {
   pio0->txf[1] = (i2c_params[2] / 10) - 3;
 
   printf("arm with %d / %d\n", i2c_params[2], i2c_params[3]);
-
-  // configure dma
-  dma_channel_configure(dma_rx, &dma_c, (volatile void *)data,
-                        (const volatile void *)&(pio0->rxf[0]), i2c_params[0],
-                        false);
-
-  // start dma
-  dma_channel_start(dma_rx);
-  printf("dma started\n");
 
   pio_enable_sm_mask_in_sync(pio0, 0b11);
   armed = true;
@@ -159,8 +146,8 @@ int main() {
   gpio_put(status_pin, false);
 
   // dma
-  dma = dma_claim_unused_channel(true);
-  dma_c = dma_channel_get_default_config(dma_rx);
+  const uint32_t dma_rx = dma_claim_unused_channel(true);
+  dma_channel_config dma_c = dma_channel_get_default_config(dma_rx);
   channel_config_set_transfer_data_size(&dma_c, DMA_SIZE_32);
   channel_config_set_dreq(&dma_c, pio_get_dreq(pio0, 0, false));
   channel_config_set_read_increment(&dma_c, false);
@@ -175,9 +162,24 @@ int main() {
       tight_loop_contents();
     }
 
+    // deploy dma
+    dma_channel_configure(dma_rx, &dma_c, (volatile void *)data,
+                          (const volatile void *)&(pio0->rxf[0]), i2c_params[0],
+                          false);
+
+    // start dma
+    dma_channel_start(dma_rx);
+    printf("dma started\n");
+
     // wait for complete
     dma_channel_wait_for_finish_blocking(dma_rx);
     printf("dma completed\n");
+
+    /*
+    for (int j = 0; j < i2c_params[0]; j++) {
+      data[j] = pio_sm_get_blocking(pio0, 0);
+    }
+    */
 
     disarm();
 
