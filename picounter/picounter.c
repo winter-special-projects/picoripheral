@@ -65,7 +65,6 @@ void disarm() {
   // disarm flag
   armed = false;
 
-
   // disable
   pio_sm_set_enabled(pio0, 0, false);
   pio_sm_set_enabled(pio0, 1, false);
@@ -164,7 +163,8 @@ int main() {
     }
 
     // deploy dma
-    dma_channel_configure(dma_rx, &dma_c, (volatile void *) data, (const volatile void *) &(pio0->rxf[0]), i2c_params[0],
+    dma_channel_configure(dma_rx, &dma_c, (volatile void *)data,
+                          (const volatile void *)&(pio0->rxf[0]), i2c_params[0],
                           false);
 
     // start dma
