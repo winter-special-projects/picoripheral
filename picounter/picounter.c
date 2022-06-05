@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "hardware/clocks.h"
+#include "hardware/dma.h"
 #include "hardware/i2c.h"
 #include "hardware/irq.h"
 #include "hardware/pio.h"
@@ -10,11 +11,11 @@
 #include "clock.pio.h"
 #include "counter.pio.h"
 
-// 50000 uint32_t is 200kB i.e. _most_ of the available RAM
-#define SIZE 50000
-
 volatile uint32_t counter, counts;
 volatile bool armed;
+
+// 50000 uint32_t is 200kB i.e. _most_ of the available RAM
+#define SIZE 50000
 uint32_t data[SIZE];
 
 // i2c setup
@@ -141,6 +142,14 @@ int main() {
   gpio_set_dir(status_pin, GPIO_OUT);
   gpio_put(status_pin, false);
 
+  // dma
+  const uint32_t dma_rx = dma_claim_unused_channel(true);
+  dma_channel_config dma_c = dma_channel_get_default_config(dma_rx);
+  channel_config_set_transfer_data_size(&dma_c, DMA_SIZE_32);
+  channel_config_set_dreq(&dma_c, pio_get_dreq(pio0, 0, false));
+  channel_config_set_read_increment(&dma_c, false);
+  channel_config_set_write_increment(&dma_c, true);
+
   armed = false;
 
   while (true) {
@@ -149,9 +158,21 @@ int main() {
       tight_loop_contents();
     }
 
+    // deploy dma
+    dma_channel_configure(dma_rx, &dma_c, &(pio0->rxf[0]), data, i2c_params[0],
+                          false);
+
+    // start dma
+    dma_start_channel_mask(1u << dma_rx);
+
+    // wait for complete
+    dma_channel_wait_for_finish_blocking(dma_rx);
+
+    /*
     for (int j = 0; j < i2c_params[0]; j++) {
       data[j] = pio_sm_get_blocking(pio0, 0);
     }
+    */
 
     disarm();
 
