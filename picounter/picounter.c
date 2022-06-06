@@ -171,22 +171,24 @@ int main() {
       tight_loop_contents();
     }
 
-    int count = i2c_params[0] / 2;
+    int ct = i2c_params[0] / 2;
 
     dma_channel_configure(dma_a, &dmac_a, 0,
-                          (const volatile void *)&(pio0->rxf[0]), count, false);
-    dma_channel_configure(dma_b, &dmac_b, 0,
-                          (const volatile void *)&(pio0->rxf[0]), count, false);
+                          (const volatile void *)&(pio0->rxf[0]), ct, false);
 
-    dma_channel_set_write_addr(dma_a, (volatile void *)&data[count * 0], false);
-    dma_channel_set_write_addr(dma_b, (volatile void *)&data[count * 1], false);
-    channel_config_set_chain_to(&dmac_a, dma_b);
+    dma_channel_set_write_addr(dma_a, (volatile void *)&data[ct * 0], false);
 
     // start dma
     dma_channel_start(dma_a);
     printf("dma started\n");
 
-    // wait for complete
+    // configure other channel
+    dma_channel_configure(dma_b, &dmac_b, 0,
+                          (const volatile void *)&(pio0->rxf[0]), ct, false);
+    dma_channel_set_write_addr(dma_b, (volatile void *)&data[ct * 1], false);
+    channel_config_set_chain_to(&dmac_a, dma_b);
+
+    // wait for complete - triggers other channel
     dma_channel_wait_for_finish_blocking(dma_a);
     printf("dma (a) completed\n");
 
