@@ -146,12 +146,12 @@ int main() {
   gpio_put(status_pin, false);
 
   // dma
-  const uint32_t dma_rx = dma_claim_unused_channel(true);
-  dma_channel_config dma_c = dma_channel_get_default_config(dma_rx);
-  channel_config_set_transfer_data_size(&dma_c, DMA_SIZE_32);
-  channel_config_set_dreq(&dma_c, pio_get_dreq(pio0, 0, false));
-  channel_config_set_read_increment(&dma_c, false);
-  channel_config_set_write_increment(&dma_c, true);
+  const uint32_t dma_a = dmac_alaim_unused_channel(true);
+  dma_channel_config dmac_a = dma_channel_get_default_config(dma_a);
+  channel_config_set_transfer_data_size(&dmac_a, DMA_SIZE_32);
+  channel_config_set_dreq(&dmac_a, pio_get_dreq(pio0, 0, false));
+  channel_config_set_read_increment(&dmac_a, false);
+  channel_config_set_write_increment(&dmac_a, true);
   printf("dma configured\n");
 
   armed = false;
@@ -163,16 +163,16 @@ int main() {
     }
 
     // deploy dma
-    dma_channel_configure(dma_rx, &dma_c, (volatile void *)data,
+    dma_channel_configure(dma_a, &dmac_a, (volatile void *)data,
                           (const volatile void *)&(pio0->rxf[0]), i2c_params[0],
                           false);
 
     // start dma
-    dma_channel_start(dma_rx);
+    dma_channel_start(dma_a);
     printf("dma started\n");
 
     // wait for complete
-    dma_channel_wait_for_finish_blocking(dma_rx);
+    dma_channel_wait_for_finish_blocking(dma_a);
     printf("dma completed\n");
 
     disarm();
