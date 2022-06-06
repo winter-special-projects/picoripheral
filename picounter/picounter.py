@@ -58,6 +58,6 @@ if __name__ == "__main__":
     pc.arm()
     while pc.armed():
         pass
-    high, low = pc.read(div=5)
+    high, low = pc.read(div=1)
     for j, (h, l) in enumerate(zip(high, low)):
         print(j, h, l)

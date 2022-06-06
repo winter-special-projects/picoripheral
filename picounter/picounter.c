@@ -146,7 +146,7 @@ int main() {
   gpio_put(status_pin, false);
 
   // dma
-  const uint32_t dma_a = dmac_alaim_unused_channel(true);
+  const uint32_t dma_a = dma_claim_unused_channel(true);
   dma_channel_config dmac_a = dma_channel_get_default_config(dma_a);
   channel_config_set_transfer_data_size(&dmac_a, DMA_SIZE_32);
   channel_config_set_dreq(&dmac_a, pio_get_dreq(pio0, 0, false));
