@@ -173,13 +173,10 @@ int main() {
 
     int count = i2c_params[0] / 2;
 
-    dma_channel_configure(dma_a, &dmac_a, 0,
+    dma_channel_configure(dma_a, &dmac_a, (volatile void *)&data[count * 0],
                           (const volatile void *)&(pio0->rxf[0]), count, false);
-    dma_channel_configure(dma_b, &dmac_b, 0,
+    dma_channel_configure(dma_b, &dmac_b, (volatile void *)&data[count * 1],
                           (const volatile void *)&(pio0->rxf[0]), count, false);
-
-    dma_channel_set_write_addr(dma_a, (volatile void *)&data[count * 0], false);
-    dma_channel_set_write_addr(dma_b, (volatile void *)&data[count * 1], false);
 
     channel_config_set_chain_to(&dmac_a, dma_b);
 
@@ -188,8 +185,11 @@ int main() {
     printf("dma started\n");
 
     // wait for complete
+    dma_channel_wait_for_finish_blocking(dma_a);
+    printf("dma (a) completed\n");
+
     dma_channel_wait_for_finish_blocking(dma_b);
-    printf("dma completed\n");
+    printf("dma (b) completed\n");
 
     disarm();
 
