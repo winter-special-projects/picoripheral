@@ -178,10 +178,10 @@ int main() {
     dma_channel_configure(dma_b, &dmac_b, 0,
                           (const volatile void *)&(pio0->rxf[0]), count, false);
 
-    dma_channel_set_write_addr(dma_a, (volatile void *)&data[count * 0]);
-    dma_channel_set_write_addr(dma_a, (volatile void *)&data[count * 1]);
+    dma_channel_set_write_addr(dma_a, (volatile void *)&data[count * 0], false);
+    dma_channel_set_write_addr(dma_a, (volatile void *)&data[count * 1], false);
 
-    channel_config_set_chain_to(dmac_a, dma_b);
+    channel_config_set_chain_to(&dmac_a, dma_b);
 
     // start dma
     dma_channel_start(dma_a);
