@@ -14,8 +14,8 @@
 volatile uint32_t counter, counts;
 volatile bool armed;
 
-// 40000 uint32_t is 160kB i.e. _much_ of the available RAM
-#define SIZE 40000
+// 50000 uint32_t is 200kB i.e. _much_ of the available RAM
+#define SIZE 50000
 uint32_t data[SIZE];
 
 // i2c setup
