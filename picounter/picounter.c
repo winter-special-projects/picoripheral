@@ -156,8 +156,6 @@ int main() {
     channel_config_set_dreq(&dmac[j], pio_get_dreq(pio0, 0, false));
     channel_config_set_read_increment(&dmac[j], false);
     channel_config_set_write_increment(&dmac[j], true);
-    if (j < 3)
-      channel_config_set_chain_to(&dmac[j], dma[j + 1]);
     printf("dma %d configured\n", j);
   }
 
@@ -176,6 +174,8 @@ int main() {
       dma_channel_configure(dma[j], &dmac[j], 0,
                             (const volatile void *)&(pio0->rxf[0]), ct, false);
       dma_channel_set_write_addr(dma[j], (volatile void *)&data[ct * j], false);
+      if (j < 3)
+        channel_config_set_chain_to(&dmac[j], dma[j + 1]);
     }
 
     // start dma
