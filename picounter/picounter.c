@@ -14,8 +14,8 @@
 volatile uint32_t counter, counts;
 volatile bool armed;
 
-// 50000 uint32_t is 200kB i.e. _most_ of the available RAM
-#define SIZE 50000
+// 40000 uint32_t is 160kB i.e. _much_ of the available RAM
+#define SIZE 40000
 uint32_t data[SIZE];
 
 // i2c setup
@@ -171,24 +171,36 @@ int main() {
       tight_loop_contents();
     }
 
-    int ct = i2c_params[0] / 2;
+    volatile int ct = i2c_params[0] / 4;
 
+    // configure channels
     dma_channel_configure(dma_a, &dmac_a, 0,
+                          (const volatile void *)&(pio0->rxf[0]), ct, false);
+    dma_channel_configure(dma_b, &dmac_b, 0,
                           (const volatile void *)&(pio0->rxf[0]), ct, false);
 
     dma_channel_set_write_addr(dma_a, (volatile void *)&data[ct * 0], false);
+    channel_config_set_chain_to(&dmac_a, dma_b);
 
     // start dma
     dma_channel_start(dma_a);
     printf("dma started\n");
 
-    // configure other channel
-    dma_channel_configure(dma_b, &dmac_b, 0,
-                          (const volatile void *)&(pio0->rxf[0]), ct, false);
     dma_channel_set_write_addr(dma_b, (volatile void *)&data[ct * 1], false);
-    channel_config_set_chain_to(&dmac_a, dma_b);
+    channel_config_set_chain_to(&dmac_b, dma_a);
 
     // wait for complete - triggers other channel
+    dma_channel_wait_for_finish_blocking(dma_a);
+    printf("dma (a) completed\n");
+
+    dma_channel_set_write_addr(dma_a, (volatile void *)&data[ct * 2], false);
+    channel_config_set_chain_to(&dmac_a, dma_b);
+
+    dma_channel_wait_for_finish_blocking(dma_b);
+    printf("dma (b) completed\n");
+
+    dma_channel_set_write_addr(dma_b, (volatile void *)&data[ct * 3], false);
+
     dma_channel_wait_for_finish_blocking(dma_a);
     printf("dma (a) completed\n");
 
@@ -198,7 +210,6 @@ int main() {
     disarm();
 
     // fix up data - retain MSB as high / low
-
     for (int j = 0; j < i2c_params[0]; j++) {
       uint32_t ticks = data[j] - 1;
       if (ticks & 0x80000000) {
@@ -209,10 +220,15 @@ int main() {
         data[j] = ticks;
       }
     }
+
     // spi transfer
     uint8_t *buffer = (uint8_t *)data;
     int transmit =
         spi_write_read_blocking(spi, buffer, buffer, 4 * i2c_params[0]);
     printf("sent %d bytes\n", transmit);
   }
+
+  dma_channel_unclaim(dma_a);
+  dma_channel_unclaim(dma_b);
+  return 0;
 }
