@@ -171,10 +171,10 @@ int main() {
 
     // configure channels
     for (int j = 0; j < 4; j++) {
-      dma_channel_configure(dma[j], &dmac[j], (volatile void *)&data[ct * j],
-                            (const volatile void *)&(pio0->rxf[0]), ct, false);
       if (j < 3)
         channel_config_set_chain_to(&dmac[j], dma[j + 1]);
+      dma_channel_configure(dma[j], &dmac[j], (volatile void *)&data[ct * j],
+                            (const volatile void *)&(pio0->rxf[0]), ct, false);
     }
 
     // start dma
