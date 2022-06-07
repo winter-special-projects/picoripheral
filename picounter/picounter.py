@@ -42,23 +42,14 @@ class Picounter:
         spi.bits_per_word = 8
         spi.max_speed_hz = 10_000_000
 
-        ct = self._count // 4
+        zero = [0 for j in range(4 * self._count)]
+        print(f"sending {len(zero)} bytes")
+        data = bytearray(spi.xfer3(zero))
+        spi.close()
 
-        data = {}
-
-        for _ in range(4):
-            zero = [0 for j in range(4 * ct)]
-            print(f"sending {len(zero)} bytes")
-            data[_] = bytearray(spi.xfer3(zero))
-            spi.close()
-
-        high = []
-        low = []
-        for _ in range(4):
-            x = struct.unpack(f"{ct}I", data[_])
-            high.extend([d - 0x80000000 for d in x if d >= 0x8000000])
-            low.extend([d for d in x if d < 0x8000000])
-
+        data = struct.unpack(f"{self._count}I", data)
+        high = [d - 0x80000000 for d in data if d >= 0x8000000]
+        low = [d for d in data if d < 0x8000000]
         return high, low
 
 

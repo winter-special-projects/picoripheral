@@ -188,17 +188,10 @@ int main() {
     for (int j = 0; j < 4; j++) {
       dma_channel_wait_for_finish_blocking(dma[j]);
       printf("dma %d completed\n", j);
-
-      // spi transfer
-      printf("sending %d over spi\n", ct);
-      uint8_t *buffer = (uint8_t *)data;
-      int transmit = spi_write_read_blocking(spi, buffer, buffer, 4 * ct);
-      printf("sent %d bytes\n", transmit);
     }
 
     disarm();
 
-    /* WORK THIS BACK IN LATER
     // fix up data - retain MSB as high / low
     for (int j = 0; j < nn; j++) {
       uint32_t ticks = data[j] - 1;
@@ -210,9 +203,12 @@ int main() {
         data[j] = ticks;
       }
     }
-    */
 
-    // SPI transfer was here && 4 * nn bytes
+    // spi transfer
+    printf("sending %d over spi\n", nn);
+    uint8_t *buffer = (uint8_t *)data;
+    int transmit = spi_write_read_blocking(spi, buffer, buffer, 4 * nn);
+    printf("sent %d bytes\n", transmit);
   }
 
   for (int j = 0; j < 3; j++)
