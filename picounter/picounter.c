@@ -14,7 +14,7 @@
 volatile uint32_t counter, counts;
 volatile bool armed;
 
-// 50000 uint32_t is 200kB i.e. _most_ of the available RAM
+// 50000 uint32_t is 200kB i.e. _much_ of the available RAM
 #define SIZE 50000
 uint32_t data[SIZE];
 
@@ -57,7 +57,6 @@ void arm() {
 
   printf("arm with %d / %d\n", i2c_params[2], i2c_params[3]);
 
-  pio_enable_sm_mask_in_sync(pio0, 0b11);
   armed = true;
 }
 
@@ -146,13 +145,18 @@ int main() {
   gpio_put(status_pin, false);
 
   // dma
-  const uint32_t dma_rx = dma_claim_unused_channel(true);
-  dma_channel_config dma_c = dma_channel_get_default_config(dma_rx);
-  channel_config_set_transfer_data_size(&dma_c, DMA_SIZE_32);
-  channel_config_set_dreq(&dma_c, pio_get_dreq(pio0, 0, false));
-  channel_config_set_read_increment(&dma_c, false);
-  channel_config_set_write_increment(&dma_c, true);
-  printf("dma configured\n");
+  uint32_t dma[4];
+  dma_channel_config dmac[4];
+
+  for (int j = 0; j < 4; j++) {
+    dma[j] = dma_claim_unused_channel(true);
+    dmac[j] = dma_channel_get_default_config(dma[j]);
+    channel_config_set_transfer_data_size(&dmac[j], DMA_SIZE_32);
+    channel_config_set_dreq(&dmac[j], pio_get_dreq(pio0, 0, false));
+    channel_config_set_read_increment(&dmac[j], false);
+    channel_config_set_write_increment(&dmac[j], true);
+    printf("dma %d configured\n", j);
+  }
 
   armed = false;
 
@@ -162,24 +166,34 @@ int main() {
       tight_loop_contents();
     }
 
-    // deploy dma
-    dma_channel_configure(dma_rx, &dma_c, (volatile void *)data,
-                          (const volatile void *)&(pio0->rxf[0]), i2c_params[0],
-                          false);
+    volatile int nn = i2c_params[0];
+    volatile int ct = nn / 4;
+
+    // configure channels
+    for (int j = 0; j < 4; j++) {
+      if (j < 3)
+        channel_config_set_chain_to(&dmac[j], dma[j + 1]);
+      dma_channel_configure(dma[j], &dmac[j], (volatile void *)&data[ct * j],
+                            (const volatile void *)&(pio0->rxf[0]), ct, false);
+    }
 
     // start dma
-    dma_channel_start(dma_rx);
-    printf("dma started\n");
+    dma_channel_start(dma[0]);
+    printf("dma 0 started\n");
 
-    // wait for complete
-    dma_channel_wait_for_finish_blocking(dma_rx);
-    printf("dma completed\n");
+    // start clocks
+    pio_enable_sm_mask_in_sync(pio0, 0b11);
+
+    // wait for complete - triggers other channel
+    for (int j = 0; j < 4; j++) {
+      dma_channel_wait_for_finish_blocking(dma[j]);
+      printf("dma %d completed\n", j);
+    }
 
     disarm();
 
     // fix up data - retain MSB as high / low
-
-    for (int j = 0; j < i2c_params[0]; j++) {
+    for (int j = 0; j < nn; j++) {
       uint32_t ticks = data[j] - 1;
       if (ticks & 0x80000000) {
         ticks = 50 * (0xffffffff - ticks);
@@ -189,10 +203,15 @@ int main() {
         data[j] = ticks;
       }
     }
+
     // spi transfer
+    printf("sending %d over spi\n", nn);
     uint8_t *buffer = (uint8_t *)data;
-    int transmit =
-        spi_write_read_blocking(spi, buffer, buffer, 4 * i2c_params[0]);
+    int transmit = spi_write_read_blocking(spi, buffer, buffer, 4 * nn);
     printf("sent %d bytes\n", transmit);
   }
+
+  for (int j = 0; j < 3; j++)
+    dma_channel_unclaim(dma[j]);
+  return 0;
 }

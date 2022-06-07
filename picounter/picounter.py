@@ -43,21 +43,21 @@ class Picounter:
         spi.max_speed_hz = 10_000_000
 
         zero = [0 for j in range(4 * self._count)]
+        print(f"sending {len(zero)} bytes")
         data = bytearray(spi.xfer3(zero))
         spi.close()
 
         data = struct.unpack(f"{self._count}I", data)
-        high = [d - 0x80000000 for d in data if d > 0x8000000]
+        high = [d - 0x80000000 for d in data if d >= 0x8000000]
         low = [d for d in data if d < 0x8000000]
         return high, low
 
 
 if __name__ == "__main__":
     pc = Picounter()
-    pc.setup(50000, 0, 100, 900)
+    pc.setup(50000, 0, 100, 100)
     pc.arm()
     while pc.armed():
         pass
     high, low = pc.read()
-    for j, (h, l) in enumerate(zip(high, low)):
-        print(j, h, l)
+    print(len(high), len(low), set(high), set(low))
