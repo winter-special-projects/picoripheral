@@ -57,6 +57,7 @@ void arm() {
 
   printf("arm with %d / %d\n", i2c_params[2], i2c_params[3]);
 
+  pio_enable_sm_mask_in_sync(pio0, 0b11);
   armed = true;
 }
 
@@ -144,23 +145,19 @@ int main() {
   gpio_set_dir(status_pin, GPIO_OUT);
   gpio_put(status_pin, false);
 
-  // dma a
-  const uint32_t dma_a = dma_claim_unused_channel(true);
-  dma_channel_config dmac_a = dma_channel_get_default_config(dma_a);
-  channel_config_set_transfer_data_size(&dmac_a, DMA_SIZE_32);
-  channel_config_set_dreq(&dmac_a, pio_get_dreq(pio0, 0, false));
-  channel_config_set_read_increment(&dmac_a, false);
-  channel_config_set_write_increment(&dmac_a, true);
-  printf("dma (a) configured\n");
+  // dma
+  uint32_t dma[4];
+  dma_channel_config dma_c[4];
 
-  // dma a
-  const uint32_t dma_b = dma_claim_unused_channel(true);
-  dma_channel_config dmac_b = dma_channel_get_default_config(dma_b);
-  channel_config_set_transfer_data_size(&dmac_b, DMA_SIZE_32);
-  channel_config_set_dreq(&dmac_b, pio_get_dreq(pio0, 0, false));
-  channel_config_set_read_increment(&dmac_b, false);
-  channel_config_set_write_increment(&dmac_b, true);
-  printf("dma (b) configured\n");
+  for (int j = 0; j < 4; j++) {
+    dma[j] = dma_claim_unused_channel(true);
+    dmac[j] = dma_channel_get_default_config(dma[j]);
+    channel_config_set_transfer_data_size(&dmac[j], DMA_SIZE_32);
+    channel_config_set_dreq(&dmac[j], pio_get_dreq(pio0, 0, false));
+    channel_config_set_read_increment(&dmac[j], false);
+    channel_config_set_write_increment(&dmac[j], true);
+    printf("dma %d configured\n", j);
+  }
 
   armed = false;
 
@@ -173,41 +170,23 @@ int main() {
     volatile int ct = i2c_params[0] / 4;
 
     // configure channels
-    dma_channel_configure(dma_a, &dmac_a, 0,
-                          (const volatile void *)&(pio0->rxf[0]), ct, false);
-    dma_channel_configure(dma_b, &dmac_b, 0,
-                          (const volatile void *)&(pio0->rxf[0]), ct, false);
-
-    // trigger
-    pio_enable_sm_mask_in_sync(pio0, 0b11);
-
-    dma_channel_set_write_addr(dma_a, (volatile void *)&data[ct * 0], false);
-    channel_config_set_chain_to(&dmac_a, dma_b);
+    for (int j = 0; j < 4; j++) {
+      dma_channel_configure(dma[j], &dmac[j], 0,
+                            (const volatile void *)&(pio0->rxf[0]), ct, false);
+      dma_channel_set_write_addr(dma[j], (volatile void *)&data[ct * j], false);
+      if (j < 3)
+        channel_config_set_chain_to(&dmac[j], dma[j + 1]);
+    }
 
     // start dma
-    dma_channel_start(dma_a);
-    printf("dma started\n");
-
-    dma_channel_set_write_addr(dma_b, (volatile void *)&data[ct * 1], false);
-    channel_config_set_chain_to(&dmac_b, dma_a);
+    dma_channel_start(dma[0]);
+    printf("dma 0 started\n");
 
     // wait for complete - triggers other channel
-    dma_channel_wait_for_finish_blocking(dma_a);
-    printf("dma (a) completed\n");
-
-    dma_channel_set_write_addr(dma_a, (volatile void *)&data[ct * 2], false);
-    channel_config_set_chain_to(&dmac_a, dma_b);
-
-    dma_channel_wait_for_finish_blocking(dma_b);
-    printf("dma (b) completed\n");
-
-    dma_channel_set_write_addr(dma_b, (volatile void *)&data[ct * 3], false);
-
-    dma_channel_wait_for_finish_blocking(dma_a);
-    printf("dma (a) completed\n");
-
-    dma_channel_wait_for_finish_blocking(dma_b);
-    printf("dma (b) completed\n");
+    for (int j = 0; j < 4; j++) {
+      dma_channel_wait_for_finish_blocking(dma[j]);
+      printf("dma %d completed\n", j);
+    }
 
     disarm();
 
@@ -230,7 +209,7 @@ int main() {
     printf("sent %d bytes\n", transmit);
   }
 
-  dma_channel_unclaim(dma_a);
-  dma_channel_unclaim(dma_b);
+  for (int j = 0; j < 3; j++)
+    dma_channel_unclaim(dma[j]);
   return 0;
 }
