@@ -35,18 +35,19 @@ class Picounter:
     def arm(self):
         self._smbus.write_i2c_block_data(self._i2c_address, 0xFF, [])
 
-    def read(self, div=1):
+    def read(self):
         spi = spidev.SpiDev()
         spi.open(0, 0)
         spi.mode = 3
         spi.bits_per_word = 8
         spi.max_speed_hz = 10_000_000
 
-        zero = [0 for j in range(4 * self._count // div)]
+        zero = [0 for j in range(4 * self._count)]
+        print(f"sending {len(zero)} bytes")
         data = bytearray(spi.xfer3(zero))
         spi.close()
 
-        data = struct.unpack(f"{self._count // div}I", data)
+        data = struct.unpack(f"{self._count}I", data)
         high = [d - 0x80000000 for d in data if d >= 0x8000000]
         low = [d for d in data if d < 0x8000000]
         return high, low
@@ -58,6 +59,5 @@ if __name__ == "__main__":
     pc.arm()
     while pc.armed():
         pass
-    high, low = pc.read(div=1)
-    for j, (h, l) in enumerate(zip(high, low)):
-        print(j, h, l)
+    high, low = pc.read()
+    print(len(high), len(low), set(high), set(low))

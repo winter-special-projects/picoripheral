@@ -57,7 +57,6 @@ void arm() {
 
   printf("arm with %d / %d\n", i2c_params[2], i2c_params[3]);
 
-  pio_enable_sm_mask_in_sync(pio0, 0b11);
   armed = true;
 }
 
@@ -167,7 +166,8 @@ int main() {
       tight_loop_contents();
     }
 
-    volatile int ct = i2c_params[0] / 4;
+    volatile int nn = i2c_params[0];
+    volatile int ct = nn / 4;
 
     // configure channels
     for (int j = 0; j < 4; j++) {
@@ -182,6 +182,9 @@ int main() {
     dma_channel_start(dma[0]);
     printf("dma 0 started\n");
 
+    // start clocks
+    pio_enable_sm_mask_in_sync(pio0, 0b11);
+
     // wait for complete - triggers other channel
     for (int j = 0; j < 4; j++) {
       dma_channel_wait_for_finish_blocking(dma[j]);
@@ -191,7 +194,7 @@ int main() {
     disarm();
 
     // fix up data - retain MSB as high / low
-    for (int j = 0; j < i2c_params[0]; j++) {
+    for (int j = 0; j < nn; j++) {
       uint32_t ticks = data[j] - 1;
       if (ticks & 0x80000000) {
         ticks = 50 * (0xffffffff - ticks);
@@ -203,9 +206,9 @@ int main() {
     }
 
     // spi transfer
+    printf("sending %d over spi\n", nn);
     uint8_t *buffer = (uint8_t *)data;
-    int transmit =
-        spi_write_read_blocking(spi, buffer, buffer, 4 * i2c_params[0]);
+    int transmit = spi_write_read_blocking(spi, buffer, buffer, 4 * nn);
     printf("sent %d bytes\n", transmit);
   }
 
