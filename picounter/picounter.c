@@ -57,7 +57,6 @@ void arm() {
 
   printf("arm with %d / %d\n", i2c_params[2], i2c_params[3]);
 
-  pio_enable_sm_mask_in_sync(pio0, 0b11);
   armed = true;
 }
 
@@ -178,6 +177,9 @@ int main() {
                           (const volatile void *)&(pio0->rxf[0]), ct, false);
     dma_channel_configure(dma_b, &dmac_b, 0,
                           (const volatile void *)&(pio0->rxf[0]), ct, false);
+
+    // trigger
+    pio_enable_sm_mask_in_sync(pio0, 0b11);
 
     dma_channel_set_write_addr(dma_a, (volatile void *)&data[ct * 0], false);
     channel_config_set_chain_to(&dmac_a, dma_b);
