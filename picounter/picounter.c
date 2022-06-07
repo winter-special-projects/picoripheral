@@ -147,7 +147,7 @@ int main() {
 
   // dma
   uint32_t dma[4];
-  dma_channel_config dma_c[4];
+  dma_channel_config dmac[4];
 
   for (int j = 0; j < 4; j++) {
     dma[j] = dma_claim_unused_channel(true);
