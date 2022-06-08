@@ -194,29 +194,29 @@ int main() {
     for (int j = 0; j < 4; j++) {
       dma_channel_wait_for_finish_blocking(dma[j]);
       printf("dma %d completed\n", j);
+
+      // fix up data - retain MSB as high / low
+      for (int k = 0; k < ct; k++) {
+        uint32_t ticks = data[j * ct + k] - 1;
+        if (ticks & 0x80000000) {
+          ticks = 50 * (0xffffffff - ticks);
+          data[j * ct + k] = ticks + 0x80000000;
+        } else {
+          ticks = 50 * (0x7fffffff - ticks);
+          data[j * ct + k] = ticks;
+        }
+      }
+
+      // spi transfer - set data pin to high to initiate transfer
+      printf("sending %d over spi\n", ct);
+      gpio_put(data_pin, true);
+      uint8_t *buffer = (uint8_t *)&data[j * ct];
+      int transmit = spi_write_read_blocking(spi, buffer, buffer, 4 * ct);
+      gpio_put(data_pin, false);
+      printf("sent %d bytes\n", transmit);
     }
 
     disarm();
-
-    // fix up data - retain MSB as high / low
-    for (int j = 0; j < nn; j++) {
-      uint32_t ticks = data[j] - 1;
-      if (ticks & 0x80000000) {
-        ticks = 50 * (0xffffffff - ticks);
-        data[j] = ticks + 0x80000000;
-      } else {
-        ticks = 50 * (0x7fffffff - ticks);
-        data[j] = ticks;
-      }
-    }
-
-    // spi transfer - set data pin to high to initiate transfer
-    printf("sending %d over spi\n", nn);
-    gpio_put(data_pin, true);
-    uint8_t *buffer = (uint8_t *)data;
-    int transmit = spi_write_read_blocking(spi, buffer, buffer, 4 * nn);
-    gpio_put(data_pin, false);
-    printf("sent %d bytes\n", transmit);
   }
 
   for (int j = 0; j < 3; j++)
