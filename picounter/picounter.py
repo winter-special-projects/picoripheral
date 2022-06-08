@@ -21,7 +21,7 @@ class Picounter:
     def __del__(self):
         GPIO.cleanup()
 
-    def armed(self):
+    def data(self):
         time.sleep(0.01)
         return GPIO.input(16)
 
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     pc = Picounter()
     pc.setup(50000, 0, 100, 100)
     pc.arm()
-    while pc.armed():
+    while not pc.data():
         pass
     high, low = pc.read()
     print(len(high), len(low), set(high), set(low))

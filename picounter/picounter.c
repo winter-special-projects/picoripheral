@@ -32,10 +32,11 @@ volatile uint32_t i2c_offset;
 // pio pointers
 uint32_t pio_off0, pio_off1;
 
-// pin definitions - should #define
-const uint32_t output_pin = 16;
-const uint32_t input_pin = 17;
-const uint32_t status_pin = 14;
+// pin definitions - using LED for status
+#define output_pin 16
+#define input_pin 17
+#define status_pin 25
+#define data_pin 14
 
 void arm() {
   // set arming on status pin
@@ -144,6 +145,11 @@ int main() {
   gpio_set_dir(status_pin, GPIO_OUT);
   gpio_put(status_pin, false);
 
+  // data pin
+  gpio_init(data_pin);
+  gpio_set_dir(data_pin, GPIO_OUT);
+  gpio_put(data_pin, false);
+
   // dma
   uint32_t dma[4];
   dma_channel_config dmac[4];
@@ -204,10 +210,12 @@ int main() {
       }
     }
 
-    // spi transfer
+    // spi transfer - set data pin to high to initiate transfer
     printf("sending %d over spi\n", nn);
+    gpio_put(data_pin, true);
     uint8_t *buffer = (uint8_t *)data;
     int transmit = spi_write_read_blocking(spi, buffer, buffer, 4 * nn);
+    gpio_put(data_pin, false);
     printf("sent %d bytes\n", transmit);
   }
 
