@@ -123,7 +123,6 @@ int main() {
   irq_set_enabled(I2C0_IRQ, true);
 
   // sensible defaults...
-  i2c_params[1] = 0;
   i2c_params[2] = 50000;
   i2c_params[3] = 50000;
 
@@ -172,8 +171,9 @@ int main() {
       tight_loop_contents();
     }
 
-    volatile int nn = i2c_params[0];
-    volatile int cy = i2c_params[1];
+    int nn = i2c_params[0];
+    int cy = i2c_params[1];
+    bool started = false;
 
     // configure channels
     while (cy > 0) {
@@ -194,12 +194,13 @@ int main() {
                               false);
       }
 
-      // start dma
-      dma_channel_start(dma[0]);
-      printf("dma 0 started\n");
-
-      // start clocks
-      pio_enable_sm_mask_in_sync(pio0, 0b11);
+      if (!started) {
+        // start dma & clocks
+        dma_channel_start(dma[0]);
+        printf("dma 0 started\n");
+        pio_enable_sm_mask_in_sync(pio0, 0b11);
+        started = true;
+      }
 
       // wait for complete - triggers other channel
       for (int j = 0; j < 4; j++) {
