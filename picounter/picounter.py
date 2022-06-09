@@ -25,11 +25,12 @@ class Picounter:
         time.sleep(0.01)
         return GPIO.input(16)
 
-    def setup(self, count, delay, high, low):
+    def setup(self, count, cycles, high, low):
         self._count = count
-        message = list(struct.pack("I", count))
+        self._cycles = cycles
+        message = list(struct.pack("II", count, cycles))
         self._smbus.write_i2c_block_data(self._i2c_address, 0x00, message)
-        message = list(struct.pack("III", delay, high, low))
+        message = list(struct.pack("II", high, low))
         self._smbus.write_i2c_block_data(self._i2c_address, 0x01, message)
 
     def arm(self):
@@ -38,7 +39,7 @@ class Picounter:
     def read(self):
         high = []
         low = []
-        for j in range(4):
+        for j in range(self._cycles):
             while not pc.data():
                 pass
 
@@ -48,14 +49,12 @@ class Picounter:
             spi.bits_per_word = 8
             spi.max_speed_hz = 10_000_000
 
-            ct = self._count // 4
-
-            zero = [0 for j in range(4 * ct)]
+            zero = [0 for j in range(4 * self._count)]
             print(f"sending {len(zero)} bytes")
             data = bytearray(spi.xfer3(zero))
             spi.close()
 
-            data = struct.unpack(f"{ct}I", data)
+            data = struct.unpack(f"{self._count}I", data)
             high.extend([d - 0x80000000 for d in data if d >= 0x8000000])
             low.extend([d for d in data if d < 0x8000000])
 
@@ -64,7 +63,7 @@ class Picounter:
 
 if __name__ == "__main__":
     pc = Picounter()
-    pc.setup(50000, 0, 100, 100)
+    pc.setup(12500, 4, 100, 100)
     pc.arm()
     high, low = pc.read()
     print(len(high), len(low), set(high), set(low))

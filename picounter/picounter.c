@@ -95,7 +95,7 @@ void i2c0_handler() {
         i2c_offset = 0x0;
       } else if (command == 0x01) {
         // write clock settings
-        i2c_offset = 0x4;
+        i2c_offset = 0x8;
       }
     } else {
       // copy in settings
@@ -173,49 +173,60 @@ int main() {
     }
 
     volatile int nn = i2c_params[0];
-    volatile int ct = nn / 4;
+    volatile int cy = i2c_params[1];
 
     // configure channels
-    for (int j = 0; j < 4; j++) {
-      if (j < 3)
-        channel_config_set_chain_to(&dmac[j], dma[j + 1]);
-      dma_channel_configure(dma[j], &dmac[j], (volatile void *)&data[ct * j],
-                            (const volatile void *)&(pio0->rxf[0]), ct, false);
-    }
-
-    // start dma
-    dma_channel_start(dma[0]);
-    printf("dma 0 started\n");
-
-    // start clocks
-    pio_enable_sm_mask_in_sync(pio0, 0b11);
-
-    // wait for complete - triggers other channel
-    for (int j = 0; j < 4; j++) {
-      dma_channel_wait_for_finish_blocking(dma[j]);
-      printf("dma %d completed\n", j);
-
-      // fix up data - retain MSB as high / low
-      for (int k = 0; k < ct; k++) {
-        uint32_t ticks = data[j * ct + k] - 1;
-        if (ticks & 0x80000000) {
-          ticks = 50 * (0xffffffff - ticks);
-          data[j * ct + k] = ticks + 0x80000000;
+    while (cy > 0) {
+      cy -= 4;
+      for (int j = 0; j < 4; j++) {
+        if (j < 3) {
+          // chain to next
+          channel_config_set_chain_to(&dmac[j], dma[j + 1]);
+        } else if (cy > 0) {
+          // chain to first
+          channel_config_set_chain_to(&dmac[j], dma[0]);
         } else {
-          ticks = 50 * (0x7fffffff - ticks);
-          data[j * ct + k] = ticks;
+          // disable chaining
+          channel_config_set_chain_to(&dmac[j], dma[j]);
         }
+        dma_channel_configure(dma[j], &dmac[j], (volatile void *)&data[nn * j],
+                              (const volatile void *)&(pio0->rxf[0]), nn,
+                              false);
       }
 
-      // spi transfer - set data pin to high to initiate transfer
-      printf("sending %d over spi\n", ct);
-      gpio_put(data_pin, true);
-      uint8_t *buffer = (uint8_t *)&data[j * ct];
-      int transmit = spi_write_read_blocking(spi, buffer, buffer, 4 * ct);
-      gpio_put(data_pin, false);
-      printf("sent %d bytes\n", transmit);
-    }
+      // start dma
+      dma_channel_start(dma[0]);
+      printf("dma 0 started\n");
 
+      // start clocks
+      pio_enable_sm_mask_in_sync(pio0, 0b11);
+
+      // wait for complete - triggers other channel
+      for (int j = 0; j < 4; j++) {
+        dma_channel_wait_for_finish_blocking(dma[j]);
+        printf("dma %d completed\n", j);
+
+        // fix up data - retain MSB as high / low
+        for (int k = 0; k < nn; k++) {
+          uint32_t ticks = data[j * nn + k] - 1;
+          if (ticks & 0x80000000) {
+            ticks = 50 * (0xffffffff - ticks);
+            data[j * nn + k] = ticks + 0x80000000;
+          } else {
+            ticks = 50 * (0x7fffffff - ticks);
+            data[j * nn + k] = ticks;
+          }
+        }
+
+        // spi transfer - set data pin to high to initiate transfer
+        printf("sending %d over spi\n", nn);
+        gpio_put(data_pin, true);
+        uint8_t *buffer = (uint8_t *)&data[j * nn];
+        int transmit = spi_write_read_blocking(spi, buffer, buffer, 4 * nn);
+        gpio_put(data_pin, false);
+        printf("sent %d bytes\n", transmit);
+      }
+    }
     disarm();
   }
 
