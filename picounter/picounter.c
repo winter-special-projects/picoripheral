@@ -176,20 +176,27 @@ int main() {
     bool started = false;
 
     // configure channels
+    for (int j = 0; j < 4; j++) {
+      if (j < 3) {
+        // chain to next
+        channel_config_set_chain_to(&dmac[j], dma[j + 1]);
+      } else if (cy > 4) {
+        // chain to first
+        channel_config_set_chain_to(&dmac[j], dma[0]);
+      } else {
+        // disable chaining
+        channel_config_set_chain_to(&dmac[j], dma[j]);
+      }
+      dma_channel_configure(dma[j], &dmac[j], (volatile void *)&data[nn * j],
+                            (const volatile void *)&(pio0->rxf[0]), nn, false);
+    }
     while (cy > 0) {
       cy -= 4;
-      for (int j = 0; j < 4; j++) {
-        if (j < 3) {
-          // chain to next
-          channel_config_set_chain_to(&dmac[j], dma[j + 1]);
-        } else if (cy > 0) {
-          // chain to first
-          channel_config_set_chain_to(&dmac[j], dma[0]);
-        } else {
-          // disable chaining
-          channel_config_set_chain_to(&dmac[j], dma[j]);
-        }
-        dma_channel_configure(dma[j], &dmac[j], (volatile void *)&data[nn * j],
+
+      if (cy == 0) {
+        // disable last cycle
+        channel_config_set_chain_to(&dmac[3], dma[3]);
+        dma_channel_configure(dma[3], &dmac[3], (volatile void *)&data[nn * 3],
                               (const volatile void *)&(pio0->rxf[0]), nn,
                               false);
       }
