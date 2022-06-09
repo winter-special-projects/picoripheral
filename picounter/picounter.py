@@ -21,21 +21,24 @@ class Picounter:
     def __del__(self):
         GPIO.cleanup()
 
-    def armed(self):
+    def data(self):
         time.sleep(0.01)
         return GPIO.input(16)
 
-    def setup(self, count, delay, high, low):
+    def setup(self, count, high, low):
         self._count = count
         message = list(struct.pack("I", count))
         self._smbus.write_i2c_block_data(self._i2c_address, 0x00, message)
-        message = list(struct.pack("III", delay, high, low))
+        message = list(struct.pack("II", high, low))
         self._smbus.write_i2c_block_data(self._i2c_address, 0x01, message)
 
     def arm(self):
         self._smbus.write_i2c_block_data(self._i2c_address, 0xFF, [])
 
     def read(self):
+        while not pc.data():
+            pass
+
         spi = spidev.SpiDev()
         spi.open(0, 0)
         spi.mode = 3
@@ -50,14 +53,13 @@ class Picounter:
         data = struct.unpack(f"{self._count}I", data)
         high = [d - 0x80000000 for d in data if d >= 0x8000000]
         low = [d for d in data if d < 0x8000000]
+
         return high, low
 
 
 if __name__ == "__main__":
     pc = Picounter()
-    pc.setup(50000, 0, 100, 100)
+    pc.setup(60000, 100, 100)
     pc.arm()
-    while pc.armed():
-        pass
     high, low = pc.read()
     print(len(high), len(low), set(high), set(low))

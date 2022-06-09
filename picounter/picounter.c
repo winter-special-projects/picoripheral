@@ -14,8 +14,8 @@
 volatile uint32_t counter, counts;
 volatile bool armed;
 
-// 50000 uint32_t is 200kB i.e. _much_ of the available RAM
-#define SIZE 50000
+// 60000 uint32_t is 240kB i.e. _almost all_ of the available RAM
+#define SIZE 60000
 uint32_t data[SIZE];
 
 // i2c setup
@@ -24,18 +24,19 @@ uint32_t data[SIZE];
 #define GPIO_SDA0 4
 #define GPIO_SCK0 5
 
-// i2c registers - counts, delay, high, low
-volatile uint32_t i2c_params[4];
+// i2c registers - counts, high, low
+volatile uint32_t i2c_params[3];
 volatile uint8_t *i2c_registers = (uint8_t *)i2c_params;
 volatile uint32_t i2c_offset;
 
 // pio pointers
 uint32_t pio_off0, pio_off1;
 
-// pin definitions - should #define
-const uint32_t output_pin = 16;
-const uint32_t input_pin = 17;
-const uint32_t status_pin = 14;
+// pin definitions - using LED for status
+#define output_pin 16
+#define input_pin 17
+#define status_pin 25
+#define data_pin 14
 
 void arm() {
   // set arming on status pin
@@ -50,12 +51,12 @@ void arm() {
   clock_program_init(pio0, 1, pio_off1, output_pin);
 
   // clock low into pio; move to isr; push high to pio
-  pio0->txf[1] = (i2c_params[3] / 10) - 3;
+  pio0->txf[1] = (i2c_params[2] / 10) - 3;
   pio_sm_exec(pio0, 1, pio_encode_pull(false, false));
   pio_sm_exec(pio0, 1, pio_encode_out(pio_isr, 32));
-  pio0->txf[1] = (i2c_params[2] / 10) - 3;
+  pio0->txf[1] = (i2c_params[1] / 10) - 3;
 
-  printf("arm with %d / %d\n", i2c_params[2], i2c_params[3]);
+  printf("arm with %d / %d\n", i2c_params[1], i2c_params[2]);
 
   armed = true;
 }
@@ -122,7 +123,6 @@ int main() {
   irq_set_enabled(I2C0_IRQ, true);
 
   // sensible defaults...
-  i2c_params[1] = 0;
   i2c_params[2] = 50000;
   i2c_params[3] = 50000;
 
@@ -144,19 +144,22 @@ int main() {
   gpio_set_dir(status_pin, GPIO_OUT);
   gpio_put(status_pin, false);
 
-  // dma
-  uint32_t dma[4];
-  dma_channel_config dmac[4];
+  // data pin
+  gpio_init(data_pin);
+  gpio_set_dir(data_pin, GPIO_OUT);
+  gpio_put(data_pin, false);
 
-  for (int j = 0; j < 4; j++) {
-    dma[j] = dma_claim_unused_channel(true);
-    dmac[j] = dma_channel_get_default_config(dma[j]);
-    channel_config_set_transfer_data_size(&dmac[j], DMA_SIZE_32);
-    channel_config_set_dreq(&dmac[j], pio_get_dreq(pio0, 0, false));
-    channel_config_set_read_increment(&dmac[j], false);
-    channel_config_set_write_increment(&dmac[j], true);
-    printf("dma %d configured\n", j);
-  }
+  // dma
+  uint32_t dma;
+  dma_channel_config dmac;
+
+  dma = dma_claim_unused_channel(true);
+  dmac = dma_channel_get_default_config(dma);
+  channel_config_set_transfer_data_size(&dmac, DMA_SIZE_32);
+  channel_config_set_dreq(&dmac, pio_get_dreq(pio0, 0, false));
+  channel_config_set_read_increment(&dmac, false);
+  channel_config_set_write_increment(&dmac, true);
+  printf("dma configured\n");
 
   armed = false;
 
@@ -166,52 +169,44 @@ int main() {
       tight_loop_contents();
     }
 
-    volatile int nn = i2c_params[0];
-    volatile int ct = nn / 4;
+    int nn = i2c_params[0];
 
-    // configure channels
-    for (int j = 0; j < 4; j++) {
-      if (j < 3)
-        channel_config_set_chain_to(&dmac[j], dma[j + 1]);
-      dma_channel_configure(dma[j], &dmac[j], (volatile void *)&data[ct * j],
-                            (const volatile void *)&(pio0->rxf[0]), ct, false);
+    if (nn > 60000) {
+      printf("Overriding to 60000\n");
+      nn = 60000;
     }
 
-    // start dma
-    dma_channel_start(dma[0]);
-    printf("dma 0 started\n");
-
-    // start clocks
+    // configure DMA channel
+    dma_channel_configure(dma, &dmac, (volatile void *)data,
+                          (const volatile void *)&(pio0->rxf[0]), nn, false);
+    dma_channel_start(dma);
+    printf("dma started\n");
     pio_enable_sm_mask_in_sync(pio0, 0b11);
+    dma_channel_wait_for_finish_blocking(dma);
+    printf("dma completed\n");
 
-    // wait for complete - triggers other channel
-    for (int j = 0; j < 4; j++) {
-      dma_channel_wait_for_finish_blocking(dma[j]);
-      printf("dma %d completed\n", j);
-    }
-
-    disarm();
-
-    // fix up data - retain MSB as high / low
-    for (int j = 0; j < nn; j++) {
-      uint32_t ticks = data[j] - 1;
+    for (int k = 0; k < nn; k++) {
+      uint32_t ticks = data[k] - 1;
       if (ticks & 0x80000000) {
         ticks = 50 * (0xffffffff - ticks);
-        data[j] = ticks + 0x80000000;
+        data[k] = ticks + 0x80000000;
       } else {
         ticks = 50 * (0x7fffffff - ticks);
-        data[j] = ticks;
+        data[k] = ticks;
       }
     }
 
-    // spi transfer
+    // spi transfer - set data pin to high to initiate transfer
     printf("sending %d over spi\n", nn);
+    gpio_put(data_pin, true);
     uint8_t *buffer = (uint8_t *)data;
     int transmit = spi_write_read_blocking(spi, buffer, buffer, 4 * nn);
+    gpio_put(data_pin, false);
     printf("sent %d bytes\n", transmit);
+
+    disarm();
   }
 
-  for (int j = 0; j < 3; j++)
-    dma_channel_unclaim(dma[j]);
+  dma_channel_unclaim(dma);
   return 0;
 }
