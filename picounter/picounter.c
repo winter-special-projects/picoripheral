@@ -51,12 +51,12 @@ void arm() {
   clock_program_init(pio0, 1, pio_off1, output_pin);
 
   // clock low into pio; move to isr; push high to pio
-  pio0->txf[1] = (i2c_params[3] / 10) - 3;
+  pio0->txf[1] = (i2c_params[2] / 10) - 3;
   pio_sm_exec(pio0, 1, pio_encode_pull(false, false));
   pio_sm_exec(pio0, 1, pio_encode_out(pio_isr, 32));
-  pio0->txf[1] = (i2c_params[2] / 10) - 3;
+  pio0->txf[1] = (i2c_params[1] / 10) - 3;
 
-  printf("arm with %d / %d\n", i2c_params[2], i2c_params[3]);
+  printf("arm with %d / %d\n", i2c_params[1], i2c_params[2]);
 
   armed = true;
 }
@@ -150,18 +150,16 @@ int main() {
   gpio_put(data_pin, false);
 
   // dma
-  uint32_t dma[4];
-  dma_channel_config dmac[4];
+  uint32_t dma;
+  dma_channel_config dmac;
 
-  for (int j = 0; j < 4; j++) {
-    dma[j] = dma_claim_unused_channel(true);
-    dmac[j] = dma_channel_get_default_config(dma[j]);
-    channel_config_set_transfer_data_size(&dmac[j], DMA_SIZE_32);
-    channel_config_set_dreq(&dmac[j], pio_get_dreq(pio0, 0, false));
-    channel_config_set_read_increment(&dmac[j], false);
-    channel_config_set_write_increment(&dmac[j], true);
-    printf("dma %d configured\n", j);
-  }
+  dma = dma_claim_unused_channel(true);
+  dmac = dma_channel_get_default_config(dma);
+  channel_config_set_transfer_data_size(&dmac, DMA_SIZE_32);
+  channel_config_set_dreq(&dmac, pio_get_dreq(pio0, 0, false));
+  channel_config_set_read_increment(&dmac, false);
+  channel_config_set_write_increment(&dmac, true);
+  printf("dma configured\n");
 
   armed = false;
 
@@ -179,13 +177,13 @@ int main() {
     }
 
     // configure DMA channel
-    dma_channel_configure(dma[j], &dmac[j], (volatile void *) data,
+    dma_channel_configure(dma, &dmac, (volatile void *) data,
                           (const volatile void *)&(pio0->rxf[0]), nn, false);
-    dma_channel_start(dma[0]);
+    dma_channel_start(dma);
     printf("dma started\n");
     pio_enable_sm_mask_in_sync(pio0, 0b11);
-    dma_channel_wait_for_finish_blocking(dma[0]);
-    printf("dma %d completed\n", j);
+    dma_channel_wait_for_finish_blocking(dma);
+    printf("dma completed\n");
 
     for (int k = 0; k < nn; k++) {
       uint32_t ticks = data[k] - 1;
@@ -209,7 +207,6 @@ int main() {
     disarm();
   }
 
-  for (int j = 0; j < 3; j++)
-    dma_channel_unclaim(dma[j]);
+  dma_channel_unclaim(dma);
   return 0;
 }
