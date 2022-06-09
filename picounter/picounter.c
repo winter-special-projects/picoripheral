@@ -177,7 +177,7 @@ int main() {
     }
 
     // configure DMA channel
-    dma_channel_configure(dma, &dmac, (volatile void *) data,
+    dma_channel_configure(dma, &dmac, (volatile void *)data,
                           (const volatile void *)&(pio0->rxf[0]), nn, false);
     dma_channel_start(dma);
     printf("dma started\n");
@@ -199,7 +199,7 @@ int main() {
     // spi transfer - set data pin to high to initiate transfer
     printf("sending %d over spi\n", nn);
     gpio_put(data_pin, true);
-    uint8_t *buffer = (uint8_t *) data;
+    uint8_t *buffer = (uint8_t *)data;
     int transmit = spi_write_read_blocking(spi, buffer, buffer, 4 * nn);
     gpio_put(data_pin, false);
     printf("sent %d bytes\n", transmit);
