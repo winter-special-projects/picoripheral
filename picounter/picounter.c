@@ -14,8 +14,8 @@
 volatile uint32_t counter, counts;
 volatile bool armed;
 
-// 50000 uint32_t is 200kB i.e. _much_ of the available RAM
-#define SIZE 50000
+// 60000 uint32_t is 240kB i.e. _almost all_ of the available RAM
+#define SIZE 60000
 uint32_t data[SIZE];
 
 // i2c setup
@@ -24,8 +24,8 @@ uint32_t data[SIZE];
 #define GPIO_SDA0 4
 #define GPIO_SCK0 5
 
-// i2c registers - counts, delay, high, low
-volatile uint32_t i2c_params[4];
+// i2c registers - counts, high, low
+volatile uint32_t i2c_params[3];
 volatile uint8_t *i2c_registers = (uint8_t *)i2c_params;
 volatile uint32_t i2c_offset;
 
@@ -95,7 +95,7 @@ void i2c0_handler() {
         i2c_offset = 0x0;
       } else if (command == 0x01) {
         // write clock settings
-        i2c_offset = 0x8;
+        i2c_offset = 0x4;
       }
     } else {
       // copy in settings
@@ -172,69 +172,40 @@ int main() {
     }
 
     int nn = i2c_params[0];
-    int cy = i2c_params[1];
-    bool started = false;
 
-    // configure channels
-    for (int j = 0; j < 4; j++) {
-      if (j < 3) {
-        // chain to next
-        channel_config_set_chain_to(&dmac[j], dma[j + 1]);
-      } else if (cy > 4) {
-        // chain to first
-        channel_config_set_chain_to(&dmac[j], dma[0]);
+    if (nn > 60000) {
+      printf("Overriding to 60000\n");
+      nn = 60000;
+    }
+
+    // configure DMA channel
+    dma_channel_configure(dma[j], &dmac[j], (volatile void *) data,
+                          (const volatile void *)&(pio0->rxf[0]), nn, false);
+    dma_channel_start(dma[0]);
+    printf("dma started\n");
+    pio_enable_sm_mask_in_sync(pio0, 0b11);
+    dma_channel_wait_for_finish_blocking(dma[0]);
+    printf("dma %d completed\n", j);
+
+    for (int k = 0; k < nn; k++) {
+      uint32_t ticks = data[k] - 1;
+      if (ticks & 0x80000000) {
+        ticks = 50 * (0xffffffff - ticks);
+        data[k] = ticks + 0x80000000;
       } else {
-        // disable chaining
-        channel_config_set_chain_to(&dmac[j], dma[j]);
-      }
-      dma_channel_configure(dma[j], &dmac[j], (volatile void *)&data[nn * j],
-                            (const volatile void *)&(pio0->rxf[0]), nn, false);
-    }
-    while (cy > 0) {
-      cy -= 4;
-
-      if (cy == 0) {
-        // disable last cycle
-        channel_config_set_chain_to(&dmac[3], dma[3]);
-        dma_channel_configure(dma[3], &dmac[3], (volatile void *)&data[nn * 3],
-                              (const volatile void *)&(pio0->rxf[0]), nn,
-                              false);
-      }
-
-      if (!started) {
-        // start dma & clocks
-        dma_channel_start(dma[0]);
-        printf("dma 0 started\n");
-        pio_enable_sm_mask_in_sync(pio0, 0b11);
-        started = true;
-      }
-
-      // wait for complete - triggers other channel
-      for (int j = 0; j < 4; j++) {
-        dma_channel_wait_for_finish_blocking(dma[j]);
-        printf("dma %d completed\n", j);
-
-        // fix up data - retain MSB as high / low
-        for (int k = 0; k < nn; k++) {
-          uint32_t ticks = data[j * nn + k] - 1;
-          if (ticks & 0x80000000) {
-            ticks = 50 * (0xffffffff - ticks);
-            data[j * nn + k] = ticks + 0x80000000;
-          } else {
-            ticks = 50 * (0x7fffffff - ticks);
-            data[j * nn + k] = ticks;
-          }
-        }
-
-        // spi transfer - set data pin to high to initiate transfer
-        printf("sending %d over spi\n", nn);
-        gpio_put(data_pin, true);
-        uint8_t *buffer = (uint8_t *)&data[j * nn];
-        int transmit = spi_write_read_blocking(spi, buffer, buffer, 4 * nn);
-        gpio_put(data_pin, false);
-        printf("sent %d bytes\n", transmit);
+        ticks = 50 * (0x7fffffff - ticks);
+        data[k] = ticks;
       }
     }
+
+    // spi transfer - set data pin to high to initiate transfer
+    printf("sending %d over spi\n", nn);
+    gpio_put(data_pin, true);
+    uint8_t *buffer = (uint8_t *) data;
+    int transmit = spi_write_read_blocking(spi, buffer, buffer, 4 * nn);
+    gpio_put(data_pin, false);
+    printf("sent %d bytes\n", transmit);
+
     disarm();
   }
 
