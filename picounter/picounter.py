@@ -59,7 +59,7 @@ class Picounter:
 
 if __name__ == "__main__":
     pc = Picounter()
-    pc.setup(12500, 100, 100)
+    pc.setup(60000, 100, 100)
     pc.arm()
     high, low = pc.read()
     print(len(high), len(low), set(high), set(low))
