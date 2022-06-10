@@ -139,18 +139,24 @@ int main() {
   adc_select_input(0);
 
   // set up ADC reading to scratch register using DMA - need two to allow
-  // constant running? try with one
-  uint32_t adc_dma;
+  // constant running? needs to flip flop
+  uint32_t adc_dma[2];
   dma_channel_config adc_dmac;
 
-  adc_dma = dma_claim_unused_channel(true);
-  adc_dmac = dma_channel_get_default_config(adc_dma);
+  adc_dma[0] = dma_claim_unused_channel(true);
+  adc_dma[1] = dma_claim_unused_channel(true);
+  adc_dmac = dma_channel_get_default_config(adc_dma[0]);
   channel_config_set_transfer_data_size(&adc_dmac, DMA_SIZE_16);
-  channel_config_set_dreq(&dmac, DREQ_ADC);
-  channel_config_set_read_increment(&dmac, false);
-  channel_config_set_write_increment(&dmac, false);
-  dma_channel_configure(adc_dma, &adc_dmac, (volatile void *) &adc_readout,
-                        (const volatile void *)&adc_hw->fifo, 0xffffffff, true);
+  channel_config_set_dreq(&adc_dmac, DREQ_ADC);
+  channel_config_set_read_increment(&adc_dmac, false);
+  channel_config_set_write_increment(&adc_dmac, false);
+  channel_config_set_chain_to(&adc_dmac, adc_dma[1]);
+  dma_channel_configure(adc_dma[0], &adc_dmac, (volatile void *) &adc_readout,
+                        (const volatile void *)&(adc_hw->fifo), 48000000, false);
+  channel_config_set_chain_to(&adc_dmac, adc_dma[0]);
+  dma_channel_configure(adc_dma[1], &adc_dmac, (volatile void *) &adc_readout,
+                        (const volatile void *)&(adc_hw->fifo), 48000000, false);
+  dma_channel_start(adc_dma[0]);
   printf("dma started\n");
 
   // led
