@@ -1,15 +1,15 @@
 .program delay
     pull block
-    mov x, y
+    mov x y
 lp0:
     jmp x-- lp0
 .wrap_target
-    mov x, osr
-    set pins, 1
+    mov x osr
+    set pins 1
 lp1:
     jmp x-- lp1
-    mov x, isr
-    set pins, 0
+    mov x isr
+    set pins 0
 lp2:
     jmp x-- lp2
 .wrap

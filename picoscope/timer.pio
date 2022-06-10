@@ -1,12 +1,12 @@
 .program timer
     pull block
 .wrap_target
-    mov x, osr
-    set pins, 1
+    mov x osr
+    set pins 1
 lp1:
     jmp x-- lp1
-    mov x, isr
-    set pins, 0
+    mov x isr
+    set pins 0
 lp2:
     jmp x-- lp2
 .wrap
