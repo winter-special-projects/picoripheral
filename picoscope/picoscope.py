@@ -45,7 +45,7 @@ class Picoscope:
         spi.open(0, 0)
         spi.mode = 3
         spi.bits_per_word = 8
-        spi.max_speed_hz = 10000000
+        spi.max_speed_hz = 10_000_000
 
         zero = [0 for j in range(2 * self._scan[3])]
         data = bytearray(spi.xfer3(zero))
@@ -63,7 +63,7 @@ class Picoscope:
 
 if __name__ == "__main__":
     pico = Picoscope()
-    pico.probe(0, 50, 50, 120000)
+    pico.probe(0, 50, 50, 120_000)
     pico.drive(0, 100, 100, 0)
     pico.arm()
     pico.trigger()
