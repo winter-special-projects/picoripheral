@@ -53,8 +53,9 @@ uint32_t driver_reader[8];
 uint32_t *driver = driver_reader;
 uint32_t *reader = driver_reader + 4;
 
-// stored data array - 100000 points is enough for 100s at 1kHz
-uint16_t data[100000];
+// stored data array - 120000 points is enough for 120s at 1kHz
+#define SIZE 120000
+uint16_t data[SIZE];
 
 // i2c helpers
 uint8_t *driver_reader_bytes = (uint8_t *)driver_reader;
