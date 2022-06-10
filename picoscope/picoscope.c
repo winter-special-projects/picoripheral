@@ -144,6 +144,7 @@ int main() {
   dma_channel_config adc_dmac;
 
   adc_fifo_setup(true, true, 1, false, false);
+  adc_set_clkdiv(0);
   adc_dma[0] = dma_claim_unused_channel(true);
   adc_dma[1] = dma_claim_unused_channel(true);
   adc_dmac = dma_channel_get_default_config(adc_dma[0]);
@@ -159,6 +160,10 @@ int main() {
                         (const volatile void *)&(adc_hw->fifo), 48000000, false);
   dma_channel_start(adc_dma[0]);
   printf("dma started\n");
+
+
+  adc_run(true);
+  printf("adc started\n");
 
   // led
   gpio_init(LED);
