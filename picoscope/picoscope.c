@@ -143,6 +143,7 @@ int main() {
   uint32_t adc_dma[2];
   dma_channel_config adc_dmac;
 
+  adc_fifo_setup(true, true, 1, false, false);
   adc_dma[0] = dma_claim_unused_channel(true);
   adc_dma[1] = dma_claim_unused_channel(true);
   adc_dmac = dma_channel_get_default_config(adc_dma[0]);
