@@ -2,6 +2,7 @@
 
 #include "hardware/adc.h"
 #include "hardware/clocks.h"
+#include "hardware/dma.h"
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
 #include "hardware/irq.h"
@@ -42,6 +43,9 @@ const pio_program_t *programs[2];
 // arm and disarm functions
 void arm();
 void disarm();
+
+// adc readout register
+volatile uint16_t adc_readout;
 
 volatile uint32_t counter, counts;
 volatile uint64_t t0, t1, dt;
@@ -89,7 +93,7 @@ void i2c0_handler() {
 void __not_in_flash_func(callback)(uint gpio, uint32_t event) {
   if (gpio == COUNTER) {
     if (event == GPIO_IRQ_EDGE_FALL) {
-      data[counter] = adc_read();
+      data[counter] = adc_readout;
       counter++;
       if (counter == counts) {
         pio_sm_set_enabled(pio1, 0, false);
@@ -133,6 +137,21 @@ int main() {
   adc_init();
   adc_gpio_init(ADC0);
   adc_select_input(0);
+
+  // set up ADC reading to scratch register using DMA - need two to allow
+  // constant running? try with one
+  uint32_t adc_dma;
+  dma_channel_config adc_dmac;
+
+  adc_dma = dma_claim_unused_channel(true);
+  adc_dmac = dma_channel_get_default_config(adc_dma);
+  channel_config_set_transfer_data_size(&adc_dmac, DMA_SIZE_16);
+  channel_config_set_dreq(&dmac, DREQ_ADC);
+  channel_config_set_read_increment(&dmac, false);
+  channel_config_set_write_increment(&dmac, false);
+  dma_channel_configure(adc_dma, &adc_dmac, (volatile void *) &adc_readout,
+                        (const volatile void *)&adc_hw->fifo, 0xffffffff, true);
+  printf("dma started\n");
 
   // led
   gpio_init(LED);

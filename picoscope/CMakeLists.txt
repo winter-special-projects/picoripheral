@@ -28,6 +28,7 @@ target_link_libraries(picoscope pico_stdlib)
 target_link_libraries(picoscope hardware_i2c)
 target_link_libraries(picoscope hardware_pio)
 target_link_libraries(picoscope hardware_adc)
+target_link_libraries(picoscope hardware_dma)
 target_link_libraries(picoscope hardware_spi)
 
 pico_add_extra_outputs(picoscope)
