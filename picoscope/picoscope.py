@@ -64,7 +64,7 @@ class Picoscope:
 if __name__ == "__main__":
     pico = Picoscope()
     pico.probe(0, 50, 50, 120_000)
-    pico.drive(0, 100, 100, 0)
+    pico.drive(0, 500, 500, 0)
     pico.arm()
     pico.trigger()
     pico.wait()
