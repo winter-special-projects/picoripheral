@@ -44,7 +44,7 @@ void arm();
 void disarm();
 
 volatile uint32_t counter, counts;
-volatile uint64_t t0, t1;
+volatile uint64_t t0, t1, dt;
 
 volatile uint16_t readout;
 
@@ -96,8 +96,8 @@ void __not_in_flash_func(callback)(uint gpio, uint32_t event) {
         pio_sm_set_enabled(pio1, 1, false);
         disarm();
         t1 = time_us_64();
+        dt = t1 - t0;
         gpio_put(LED, false);
-        printf("%d %ld\n", counter, t1 - t0);
       }
     }
   } else if (gpio == EXTERNAL) {
@@ -148,12 +148,11 @@ int main() {
   gpio_set_function(12, GPIO_FUNC_SPI);
   gpio_set_function(13, GPIO_FUNC_SPI);
   spi_set_slave(spi, true);
-  printf("Initialised SPI at %d\n", baud);
+  printf("initialised SPI at %d\n", baud);
 
   uint32_t freq = clock_get_hz(clk_sys);
 
   freq /= 25;
-  printf("Functional frequency: %d\n", freq);
 
   // set up the IRQ
   uint32_t irq_mask = GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL;
@@ -168,14 +167,14 @@ int main() {
     uint8_t *buffer = (uint8_t *)data;
     int transmit = spi_write_read_blocking(spi, buffer, buffer, 2 * counts);
     counter = 0;
-    printf("Sent %d bytes\n", transmit);
+    printf("sent %d bytes\n", transmit);
   }
 }
 
 void arm() {
   // debug info
-  printf("D: %d %d %d %d\n", driver[0], driver[1], driver[2], driver[3]);
-  printf("R: %d %d %d %d\n", reader[0], reader[1], reader[2], reader[3]);
+  printf("driver: %d %d %d %d\n", driver[0], driver[1], driver[2], driver[3]);
+  printf("reader: %d %d %d %d\n", reader[0], reader[1], reader[2], reader[3]);
 
   // driver clock
   timer(pio1, 1, CLOCK1, driver[0], driver[1], driver[2], false);
@@ -183,31 +182,28 @@ void arm() {
   // reader clock
   counts = reader[3];
   timer(pio1, 0, CLOCK0, reader[0], reader[1], reader[2], false);
-
-  // TBD do I want to set up the interrupts in here?
 }
 
 void disarm() {
   // remove programs from PIO blocks - we have two because two state machines
   pio_remove_program(pio1, programs[0], offsets[0]);
   pio_remove_program(pio1, programs[1], offsets[1]);
-  printf("Disarm\n");
 }
 
-// with-delay timer program
+// with-delay timer program - input times are in µs
 void timer(PIO pio, uint sm, uint pin, uint32_t delay, uint32_t high,
            uint32_t low, bool enable) {
-  // if delay, load one program else other
-  // set clock divider to give ~ 0.2µs / tick (i.e. /= 25)
+  // if delay, load one program else other set clock divider to give ~
+  // 0.2µs / tick (i.e. /= 25 for pico default of 125 MHz clock)
+
   delay *= 5;
   high *= 5;
   low *= 5;
+
   if (delay == 0) {
     programs[sm] = &timer_program;
     offsets[sm] = pio_add_program(pio, &timer_program);
     timer_program_init(pio, sm, offsets[sm], pin, 25);
-    // intrinsic delays - I _think_ the delay on 1st cycle is 2 not 3
-    delay -= 2;
   } else {
     programs[sm] = &delay_program;
     offsets[sm] = pio_add_program(pio, &delay_program);
