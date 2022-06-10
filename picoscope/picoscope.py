@@ -6,7 +6,7 @@ from RPi import GPIO
 import spidev
 
 
-class picoscope:
+class Picoscope:
     def __init__(self):
         # connectivity
         self._i2c_address = 0x42
@@ -64,7 +64,7 @@ class picoscope:
 if __name__ == "__main__":
     pico = Picoscope()
     pico.probe(0, 50, 50, 6000)
-    pico.drive(0, 100000, 100000, 0)
+    pico.drive(0, 100, 100, 0)
     pico.arm()
     pico.trigger()
     pico.wait()
