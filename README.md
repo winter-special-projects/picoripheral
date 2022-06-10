@@ -7,3 +7,8 @@ but records µs time spent in high, low. Simple implementation waits on high
 on GPIO, then counts.
 
 More at [Frequency Counter](./picounter/README.md)
+
+# Picoscope
+Toy oscilloscope, hardware timed ADC data capture.
+
+More at [Picoscope](./picoscope/README.md)
