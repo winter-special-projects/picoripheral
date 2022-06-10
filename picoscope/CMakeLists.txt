@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(PICO_SDK_PATH "/home/pi/C/pico/pico-sdk")
 
-include(../pico_sdk_import.cmake)
+include(../common_import.cmake)
 
 project(picoscope C CXX ASM)
 
