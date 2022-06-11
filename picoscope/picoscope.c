@@ -28,10 +28,6 @@
 // static definitions
 #define I2C_ADDR 0x42
 
-#define REG_READ 0x10
-#define REG_DRV 0x11
-#define REG_ARM 0xff
-
 // internal timer setup function
 void timer(PIO pio, uint sm, uint pin, uint32_t delay, uint32_t high,
            uint32_t low, bool enable);
