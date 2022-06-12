@@ -2,6 +2,7 @@
 
 #include "hardware/adc.h"
 #include "hardware/clocks.h"
+#include "hardware/dma.h"
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
 #include "hardware/irq.h"
@@ -17,6 +18,7 @@
 #define COUNTER 15
 #define CLOCK0 16
 #define CLOCK1 17
+#define IRQDBG 18
 
 #define LED 25
 #define ADC0 26
@@ -26,10 +28,6 @@
 
 // static definitions
 #define I2C_ADDR 0x42
-
-#define REG_READ 0x10
-#define REG_DRV 0x11
-#define REG_ARM 0xff
 
 // internal timer setup function
 void timer(PIO pio, uint sm, uint pin, uint32_t delay, uint32_t high,
@@ -42,6 +40,9 @@ const pio_program_t *programs[2];
 // arm and disarm functions
 void arm();
 void disarm();
+
+// adc readout register
+volatile uint16_t adc_readout;
 
 volatile uint32_t counter, counts;
 volatile uint64_t t0, t1, dt;
@@ -89,7 +90,7 @@ void i2c0_handler() {
 void __not_in_flash_func(callback)(uint gpio, uint32_t event) {
   if (gpio == COUNTER) {
     if (event == GPIO_IRQ_EDGE_FALL) {
-      data[counter] = adc_read();
+      data[counter] = adc_readout;
       counter++;
       if (counter == counts) {
         pio_sm_set_enabled(pio1, 0, false);
@@ -99,6 +100,8 @@ void __not_in_flash_func(callback)(uint gpio, uint32_t event) {
         dt = t1 - t0;
         gpio_put(LED, false);
       }
+      // toggle debug pin
+      gpio_put(IRQDBG, !gpio_get_out_level(IRQDBG));
     }
   } else if (gpio == EXTERNAL) {
     // trigger counters
@@ -134,10 +137,43 @@ int main() {
   adc_gpio_init(ADC0);
   adc_select_input(0);
 
+  // set up ADC reading to scratch register using DMA - need two to allow
+  // constant running? needs to flip flop
+  uint32_t adc_dma[2];
+  dma_channel_config adc_dmac;
+
+  adc_fifo_setup(true, true, 1, false, false);
+  adc_set_clkdiv(0);
+  adc_dma[0] = dma_claim_unused_channel(true);
+  adc_dma[1] = dma_claim_unused_channel(true);
+  adc_dmac = dma_channel_get_default_config(adc_dma[0]);
+  channel_config_set_transfer_data_size(&adc_dmac, DMA_SIZE_16);
+  channel_config_set_dreq(&adc_dmac, DREQ_ADC);
+  channel_config_set_read_increment(&adc_dmac, false);
+  channel_config_set_write_increment(&adc_dmac, false);
+  channel_config_set_chain_to(&adc_dmac, adc_dma[1]);
+  dma_channel_configure(adc_dma[0], &adc_dmac, (volatile void *)&adc_readout,
+                        (const volatile void *)&(adc_hw->fifo), 48000000,
+                        false);
+  channel_config_set_chain_to(&adc_dmac, adc_dma[0]);
+  dma_channel_configure(adc_dma[1], &adc_dmac, (volatile void *)&adc_readout,
+                        (const volatile void *)&(adc_hw->fifo), 48000000,
+                        false);
+  dma_channel_start(adc_dma[0]);
+  printf("dma started\n");
+
+  adc_run(true);
+  printf("adc started\n");
+
   // led
   gpio_init(LED);
   gpio_set_dir(LED, GPIO_OUT);
   gpio_put(LED, false);
+
+  // IRQ debug indicator (inverts every IRQ call)
+  gpio_init(IRQDBG);
+  gpio_set_dir(IRQDBG, GPIO_OUT);
+  gpio_put(IRQDBG, false);
 
   // spi - at demand of 10 MHz
   spi_inst_t *spi = spi1;
@@ -176,6 +212,8 @@ void arm() {
   printf("driver: %d %d %d %d\n", driver[0], driver[1], driver[2], driver[3]);
   printf("reader: %d %d %d %d\n", reader[0], reader[1], reader[2], reader[3]);
 
+  gpio_put(IRQDBG, false);
+
   // driver clock
   timer(pio1, 1, CLOCK1, driver[0], driver[1], driver[2], false);
 
@@ -188,6 +226,7 @@ void disarm() {
   // remove programs from PIO blocks - we have two because two state machines
   pio_remove_program(pio1, programs[0], offsets[0]);
   pio_remove_program(pio1, programs[1], offsets[1]);
+  gpio_put(IRQDBG, false);
 }
 
 // with-delay timer program - input times are in µs
