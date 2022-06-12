@@ -18,6 +18,7 @@
 #define COUNTER 15
 #define CLOCK0 16
 #define CLOCK1 17
+#define IRQDBG 18
 
 #define LED 25
 #define ADC0 26
@@ -99,6 +100,8 @@ void __not_in_flash_func(callback)(uint gpio, uint32_t event) {
         dt = t1 - t0;
         gpio_put(LED, false);
       }
+      // toggle debug pin
+      gpio_put(IRQDBG, !gpio_get_out_level(IRQDBG));
     }
   } else if (gpio == EXTERNAL) {
     // trigger counters
@@ -149,14 +152,15 @@ int main() {
   channel_config_set_read_increment(&adc_dmac, false);
   channel_config_set_write_increment(&adc_dmac, false);
   channel_config_set_chain_to(&adc_dmac, adc_dma[1]);
-  dma_channel_configure(adc_dma[0], &adc_dmac, (volatile void *) &adc_readout,
-                        (const volatile void *)&(adc_hw->fifo), 48000000, false);
+  dma_channel_configure(adc_dma[0], &adc_dmac, (volatile void *)&adc_readout,
+                        (const volatile void *)&(adc_hw->fifo), 48000000,
+                        false);
   channel_config_set_chain_to(&adc_dmac, adc_dma[0]);
-  dma_channel_configure(adc_dma[1], &adc_dmac, (volatile void *) &adc_readout,
-                        (const volatile void *)&(adc_hw->fifo), 48000000, false);
+  dma_channel_configure(adc_dma[1], &adc_dmac, (volatile void *)&adc_readout,
+                        (const volatile void *)&(adc_hw->fifo), 48000000,
+                        false);
   dma_channel_start(adc_dma[0]);
   printf("dma started\n");
-
 
   adc_run(true);
   printf("adc started\n");
@@ -165,6 +169,11 @@ int main() {
   gpio_init(LED);
   gpio_set_dir(LED, GPIO_OUT);
   gpio_put(LED, false);
+
+  // IRQ debug indicator (inverts every IRQ call)
+  gpio_init(IRQDBG);
+  gpio_set_dir(IRQDBG, GPIO_OUT);
+  gpio_put(IRQDBG, false);
 
   // spi - at demand of 10 MHz
   spi_inst_t *spi = spi1;
@@ -203,6 +212,8 @@ void arm() {
   printf("driver: %d %d %d %d\n", driver[0], driver[1], driver[2], driver[3]);
   printf("reader: %d %d %d %d\n", reader[0], reader[1], reader[2], reader[3]);
 
+  gpio_put(IRQDBG, false);
+
   // driver clock
   timer(pio1, 1, CLOCK1, driver[0], driver[1], driver[2], false);
 
@@ -215,6 +226,7 @@ void disarm() {
   // remove programs from PIO blocks - we have two because two state machines
   pio_remove_program(pio1, programs[0], offsets[0]);
   pio_remove_program(pio1, programs[1], offsets[1]);
+  gpio_put(IRQDBG, false);
 }
 
 // with-delay timer program - input times are in µs
