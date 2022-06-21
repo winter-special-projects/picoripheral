@@ -78,7 +78,7 @@ def main(rc):
     RC circuit from pump / probe"""
 
     T = int(round(rc, 1) * 1e6)
-    dT = int(T / 20000)
+    dT = max(20, int(T / 20000))
 
     pico = Picoscope()
     pico.probe(0, dT, dT, 120_000)
