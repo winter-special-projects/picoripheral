@@ -77,7 +77,7 @@ def main(rc):
     """Determine RC (i.e. product of resistance and capacitance) of serial 
     RC circuit from pump / probe"""
 
-    T = int(round(rc, 1) * 1e6)
+    T = int(round(rc * 1e6, 1))
     dT = max(20, int(T / 20000))
 
     pico = Picoscope()
